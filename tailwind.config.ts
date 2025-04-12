@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,16 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Colores específicos para el sistema de casas de cambio
+				finance: {
+					primary: '#1A2C42',
+					secondary: '#3498DB',
+					positive: '#4CAF50',
+					negative: '#F44336',
+					background: '#F5F7FA',
+					usd: '#85bb65',
+					eur: '#0A75BC'
 				}
 			},
 			borderRadius: {

@@ -1,13 +1,39 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import React from 'react';
+import MainLayout from '@/components/layout/MainLayout';
+import QuickStats from '@/components/dashboard/QuickStats';
+import ExchangeRateTrends from '@/components/dashboard/ExchangeRateTrends';
+import RecentTransactions from '@/components/dashboard/RecentTransactions';
+import ProfitabilityCalculator from '@/components/profitability/ProfitabilityCalculator';
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <MainLayout>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="text-sm text-gray-500">
+          {new Date().toLocaleDateString('es-PE', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })}
+        </div>
       </div>
-    </div>
+      
+      <div className="mb-6">
+        <QuickStats />
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-6">
+        <ExchangeRateTrends />
+        <RecentTransactions />
+      </div>
+      
+      <div className="mb-6">
+        <ProfitabilityCalculator />
+      </div>
+    </MainLayout>
   );
 };
 
