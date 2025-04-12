@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,15 +8,12 @@ import {
   Table, TableBody, TableCell, TableHead, 
   TableHeader, TableRow 
 } from '@/components/ui/table';
-import { 
-  Select, SelectContent, SelectItem, 
-  SelectTrigger, SelectValue 
-} from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { format } from 'date-fns';
-import { Calendar as CalendarIcon, Trash2, DollarSign, Euro } from 'lucide-react';
+import { Calendar as CalendarIcon, Trash2, RefreshCw, DollarSign, Euro } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchExchangeRates, ExchangeRateData } from '@/services/exchangeRateService';
 
 interface Transaction {
   id: number;
@@ -36,6 +33,49 @@ const Transactions: React.FC = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [rates, setRates] = useState<ExchangeRateData[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  const loadRates = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchExchangeRates();
+      setRates(data);
+      
+      // Actualizar automáticamente la tasa de cambio en el formulario
+      const selectedCurrencyRate = data.find(r => r.currency === currency);
+      if (selectedCurrencyRate) {
+        const newRate = type === 'compra' 
+          ? selectedCurrencyRate.buyRate 
+          : selectedCurrencyRate.sellRate;
+        setRate(newRate.toString());
+      }
+      
+      toast.success('Tipos de cambio actualizados');
+    } catch (error) {
+      console.error('Error al cargar tipos de cambio:', error);
+      toast.error('Error al cargar tipos de cambio');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Cargar las tasas al iniciar y cuando cambie el tipo o moneda
+  useEffect(() => {
+    loadRates();
+  }, []);
+  
+  useEffect(() => {
+    if (rates.length > 0) {
+      const selectedCurrencyRate = rates.find(r => r.currency === currency);
+      if (selectedCurrencyRate) {
+        const newRate = type === 'compra' 
+          ? selectedCurrencyRate.buyRate 
+          : selectedCurrencyRate.sellRate;
+        setRate(newRate.toString());
+      }
+    }
+  }, [type, currency, rates]);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,12 +115,16 @@ const Transactions: React.FC = () => {
     
     // Reset form
     setAmount('');
-    setRate('');
   };
   
   const deleteTransaction = (id: number) => {
     setTransactions(transactions.filter(t => t.id !== id));
     toast.success('Transacción eliminada');
+  };
+  
+  const clearAllTransactions = () => {
+    setTransactions([]);
+    toast.success('Todas las transacciones han sido eliminadas');
   };
   
   return (
@@ -148,6 +192,30 @@ const Transactions: React.FC = () => {
               </div>
               
               <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="block text-sm font-medium">Tasa de Cambio</label>
+                  <Button 
+                    type="button" 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={loadRates}
+                    disabled={loading}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <RefreshCw className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+                    Actualizar Tasa
+                  </Button>
+                </div>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={rate} 
+                  onChange={e => setRate(e.target.value)} 
+                  placeholder="Ingrese la tasa de cambio"
+                />
+              </div>
+              
+              <div className="space-y-2">
                 <label className="block text-sm font-medium">Cantidad</label>
                 <Input 
                   type="number" 
@@ -155,17 +223,6 @@ const Transactions: React.FC = () => {
                   value={amount} 
                   onChange={e => setAmount(e.target.value)} 
                   placeholder="Ingrese la cantidad"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Tasa de Cambio</label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  value={rate} 
-                  onChange={e => setRate(e.target.value)} 
-                  placeholder="Ingrese la tasa de cambio"
                 />
               </div>
               
@@ -201,8 +258,19 @@ const Transactions: React.FC = () => {
         </Card>
         
         <Card className="col-span-1">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Transacciones Recientes</CardTitle>
+            {transactions.length > 0 && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearAllTransactions}
+                className="text-red-500 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="mr-1 h-4 w-4" />
+                Borrar Todo
+              </Button>
+            )}
           </CardHeader>
           <CardContent>
             {transactions.length > 0 ? (
@@ -218,7 +286,7 @@ const Transactions: React.FC = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((transaction) => (
+                  {transactions.slice(-5).map((transaction) => (
                     <TableRow key={transaction.id}>
                       <TableCell className="capitalize">{transaction.type}</TableCell>
                       <TableCell>{transaction.currency}</TableCell>
@@ -249,8 +317,11 @@ const Transactions: React.FC = () => {
       
       {transactions.length > 0 && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Historial Completo</CardTitle>
+            <div className="text-sm text-gray-500">
+              Total: {transactions.length} transacciones
+            </div>
           </CardHeader>
           <CardContent>
             <Table>

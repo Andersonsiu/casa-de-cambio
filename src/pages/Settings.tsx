@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,17 +17,10 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { 
   DollarSign, Euro, User, Users, Bell, Shield, 
-  Trash2, Lock, Save, Plus 
+  Trash2, Lock, Save, Plus, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface ExchangeRate {
-  id: number;
-  currency: 'USD' | 'EUR';
-  buyRate: number;
-  sellRate: number;
-  lastUpdated: Date;
-}
+import { fetchExchangeRates, ExchangeRateData } from '@/services/exchangeRateService';
 
 interface User {
   id: number;
@@ -38,22 +31,10 @@ interface User {
 }
 
 const Settings: React.FC = () => {
-  const [defaultRates, setDefaultRates] = useState<ExchangeRate[]>([
-    {
-      id: 1,
-      currency: 'USD',
-      buyRate: 3.65,
-      sellRate: 3.75,
-      lastUpdated: new Date()
-    },
-    {
-      id: 2,
-      currency: 'EUR',
-      buyRate: 4.00,
-      sellRate: 4.10,
-      lastUpdated: new Date()
-    }
-  ]);
+  const [defaultRates, setDefaultRates] = useState<ExchangeRateData[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [apiEndpoint, setApiEndpoint] = useState('');
   
   const [users, setUsers] = useState<User[]>([
     {
@@ -61,13 +42,6 @@ const Settings: React.FC = () => {
       name: 'Admin Principal',
       email: 'admin@forexpro.com',
       role: 'admin',
-      active: true
-    },
-    {
-      id: 2,
-      name: 'Operador 1',
-      email: 'operador1@forexpro.com',
-      role: 'operator',
       active: true
     }
   ]);
@@ -90,17 +64,37 @@ const Settings: React.FC = () => {
     sessionTimeout: '30'
   });
   
-  const updateRate = (id: number, field: 'buyRate' | 'sellRate', value: string) => {
+  // Cargar los tipos de cambio desde la "API"
+  const loadRates = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchExchangeRates();
+      setDefaultRates(data);
+      toast.success('Tipos de cambio actualizados desde la API');
+    } catch (error) {
+      console.error('Error al cargar tipos de cambio:', error);
+      toast.error('Error al cargar tipos de cambio');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Cargar las tasas al iniciar
+  useEffect(() => {
+    loadRates();
+  }, []);
+  
+  const updateRate = (id: string, field: 'buyRate' | 'sellRate', value: string) => {
     const numValue = parseFloat(value);
     if (isNaN(numValue)) return;
     
     setDefaultRates(rates => rates.map(rate => 
-      rate.id === id 
+      rate.currency === id 
         ? { ...rate, [field]: numValue, lastUpdated: new Date() } 
         : rate
     ));
     
-    toast.success('Tasa de cambio actualizada');
+    toast.success('Tasa de cambio actualizada manualmente');
   };
   
   const addUser = () => {
@@ -150,6 +144,12 @@ const Settings: React.FC = () => {
     toast.success('Usuario eliminado');
   };
   
+  const saveAPIConfig = () => {
+    toast.success('Configuración de API guardada');
+    // Aquí se guardaría la configuración de la API
+    // En una aplicación real, esto se almacenaría en una base de datos
+  };
+  
   const saveNotificationSettings = () => {
     toast.success('Configuración de notificaciones guardada');
   };
@@ -173,8 +173,9 @@ const Settings: React.FC = () => {
       </div>
       
       <Tabs defaultValue="exchange-rates" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 mb-6">
+        <TabsList className="grid w-full grid-cols-5 mb-6">
           <TabsTrigger value="exchange-rates">Tasas de Cambio</TabsTrigger>
+          <TabsTrigger value="api-config">API Externa</TabsTrigger>
           <TabsTrigger value="users">Usuarios</TabsTrigger>
           <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
           <TabsTrigger value="security">Seguridad</TabsTrigger>
@@ -182,11 +183,22 @@ const Settings: React.FC = () => {
         
         <TabsContent value="exchange-rates">
           <Card>
-            <CardHeader>
-              <CardTitle>Configuración de Tasas de Cambio</CardTitle>
-              <CardDescription>
-                Configure las tasas de cambio predeterminadas para las operaciones
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Configuración de Tasas de Cambio</CardTitle>
+                <CardDescription>
+                  Configure las tasas de cambio predeterminadas para las operaciones
+                </CardDescription>
+              </div>
+              <Button 
+                variant="outline"
+                onClick={loadRates}
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Actualizar desde API
+              </Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -200,11 +212,11 @@ const Settings: React.FC = () => {
                 </TableHeader>
                 <TableBody>
                   {defaultRates.map((rate) => (
-                    <TableRow key={rate.id}>
+                    <TableRow key={rate.currency}>
                       <TableCell className="flex items-center">
                         {rate.currency === 'USD' ? (
                           <>
-                            <DollarSign className="mr-2 h-4 w-4 text-blue-500" />
+                            <DollarSign className="mr-2 h-4 w-4 text-green-500" />
                             Dólar Americano (USD)
                           </>
                         ) : (
@@ -219,7 +231,7 @@ const Settings: React.FC = () => {
                           type="number" 
                           step="0.01"
                           value={rate.buyRate} 
-                          onChange={(e) => updateRate(rate.id, 'buyRate', e.target.value)}
+                          onChange={(e) => updateRate(rate.currency, 'buyRate', e.target.value)}
                         />
                       </TableCell>
                       <TableCell>
@@ -227,7 +239,7 @@ const Settings: React.FC = () => {
                           type="number" 
                           step="0.01"
                           value={rate.sellRate} 
-                          onChange={(e) => updateRate(rate.id, 'sellRate', e.target.value)}
+                          onChange={(e) => updateRate(rate.currency, 'sellRate', e.target.value)}
                         />
                       </TableCell>
                       <TableCell>
@@ -238,6 +250,71 @@ const Settings: React.FC = () => {
                 </TableBody>
               </Table>
             </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="api-config">
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de API Externa</CardTitle>
+              <CardDescription>
+                Configure la conexión con la API de Bloomberg u otra fuente de tipos de cambio
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="api-url">URL de la API</Label>
+                  <Input 
+                    id="api-url"
+                    value={apiEndpoint} 
+                    onChange={(e) => setApiEndpoint(e.target.value)} 
+                    placeholder="https://api.bloomberg.com/market-data/exchange-rates"
+                  />
+                  <p className="text-sm text-gray-500">
+                    URL del endpoint de la API de tipos de cambio
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="api-key">Clave de API</Label>
+                  <Input 
+                    id="api-key"
+                    type="password"
+                    value={apiKey} 
+                    onChange={(e) => setApiKey(e.target.value)} 
+                    placeholder="Ingrese su clave de API de Bloomberg"
+                  />
+                  <p className="text-sm text-gray-500">
+                    Clave secreta para autenticarse con la API
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="api-update">Actualización Automática</Label>
+                  <Select defaultValue="30">
+                    <SelectTrigger id="api-update">
+                      <SelectValue placeholder="Frecuencia de actualización" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="15">Cada 15 minutos</SelectItem>
+                      <SelectItem value="30">Cada 30 minutos</SelectItem>
+                      <SelectItem value="60">Cada hora</SelectItem>
+                      <SelectItem value="manual">Manual solamente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-gray-500">
+                    Frecuencia con la que se actualizarán los datos desde la API
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button onClick={saveAPIConfig} className="ml-auto">
+                <Save className="mr-2 h-4 w-4" />
+                Guardar Configuración de API
+              </Button>
+            </CardFooter>
           </Card>
         </TabsContent>
         
