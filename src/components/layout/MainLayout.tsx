@@ -2,6 +2,8 @@
 import React from 'react';
 import { Menu, FileText, DollarSign, BarChart, Settings, LogOut } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -10,6 +12,14 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    // En una aplicación real, aquí se limpiarían los tokens de autenticación
+    // Por ahora, simplemente redirigimos a la página principal y mostramos un mensaje
+    toast.success('Sesión cerrada exitosamente');
+    navigate('/');
+  };
 
   return (
     <div className="flex h-screen bg-finance-background">
@@ -55,7 +65,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </ul>
         </nav>
         <div className="absolute bottom-0 w-full border-t border-gray-700 p-4">
-          <button className="flex w-full items-center gap-4 rounded-md px-4 py-3 text-gray-300 hover:bg-red-500 hover:text-white">
+          <button 
+            onClick={handleLogout}
+            className="flex w-full items-center gap-4 rounded-md px-4 py-3 text-gray-300 hover:bg-red-500 hover:text-white"
+          >
             <LogOut className="h-5 w-5" />
             <span>Cerrar Sesión</span>
           </button>
