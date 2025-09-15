@@ -1,5 +1,7 @@
 
-// Simulación de API de tipo de cambio
+// Servicio de tipos de cambio con Web Scraping
+
+import { scrapeMultipleCurrencies, convertScrapedDataToExchangeRate } from './webScrapingService';
 
 // Interfaz para los datos de tipo de cambio
 export interface ExchangeRateData {
@@ -7,35 +9,60 @@ export interface ExchangeRateData {
   buyRate: number;
   sellRate: number;
   lastUpdated: Date;
+  marketRate?: number;
+  change?: number;
+  changePercent?: number;
 }
 
-// Función que simula la obtención de datos de una API externa
+// Función principal para obtener tipos de cambio usando web scraping
 export const fetchExchangeRates = async (): Promise<ExchangeRateData[]> => {
-  // Aquí es donde conectarías con la API de Bloomberg o similar
-  // Por ahora, retornamos datos simulados
+  try {
+    console.log('Obteniendo tipos de cambio desde Google Finance...');
+    
+    // Intentar obtener datos mediante web scraping
+    const scrapedData = await scrapeMultipleCurrencies();
+    
+    if (scrapedData.length > 0) {
+      console.log('Datos obtenidos exitosamente desde Google Finance');
+      return scrapedData.map(convertScrapedDataToExchangeRate);
+    }
+    
+    // Fallback a datos simulados si el scraping falla
+    console.log('Usando datos simulados como fallback...');
+    return getFallbackRates();
+    
+  } catch (error) {
+    console.error('Error al obtener tipos de cambio:', error);
+    return getFallbackRates();
+  }
+};
+
+// Función de respaldo con datos simulados
+const getFallbackRates = (): ExchangeRateData[] => {
+  const usdBuyRate = 3.45 + Math.random() * 0.1;
+  const usdSellRate = usdBuyRate + 0.05 + Math.random() * 0.05;
   
-  // Simular un pequeño retraso como en una API real
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
-  // Generar tipos de cambio aleatorios dentro de rangos realistas
-  const usdBuyRate = 3.60 + Math.random() * 0.1; // Entre 3.60 y 3.70
-  const usdSellRate = usdBuyRate + 0.05 + Math.random() * 0.05; // Margen entre 0.05 y 0.10
-  
-  const eurBuyRate = 3.95 + Math.random() * 0.1; // Entre 3.95 y 4.05
-  const eurSellRate = eurBuyRate + 0.05 + Math.random() * 0.05; // Margen entre 0.05 y 0.10
+  const eurBuyRate = 3.80 + Math.random() * 0.1;
+  const eurSellRate = eurBuyRate + 0.05 + Math.random() * 0.05;
   
   return [
     {
       currency: 'USD',
-      buyRate: parseFloat(usdBuyRate.toFixed(2)),
-      sellRate: parseFloat(usdSellRate.toFixed(2)),
-      lastUpdated: new Date()
+      buyRate: parseFloat(usdBuyRate.toFixed(4)),
+      sellRate: parseFloat(usdSellRate.toFixed(4)),
+      lastUpdated: new Date(),
+      marketRate: parseFloat((usdBuyRate + 0.025).toFixed(4)),
+      change: parseFloat(((Math.random() - 0.5) * 0.01).toFixed(4)),
+      changePercent: parseFloat(((Math.random() - 0.5) * 0.5).toFixed(3))
     },
     {
       currency: 'EUR',
-      buyRate: parseFloat(eurBuyRate.toFixed(2)),
-      sellRate: parseFloat(eurSellRate.toFixed(2)),
-      lastUpdated: new Date()
+      buyRate: parseFloat(eurBuyRate.toFixed(4)),
+      sellRate: parseFloat(eurSellRate.toFixed(4)),
+      lastUpdated: new Date(),
+      marketRate: parseFloat((eurBuyRate + 0.025).toFixed(4)),
+      change: parseFloat(((Math.random() - 0.5) * 0.01).toFixed(4)),
+      changePercent: parseFloat(((Math.random() - 0.5) * 0.5).toFixed(3))
     }
   ];
 };

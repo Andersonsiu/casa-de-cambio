@@ -36,32 +36,32 @@ const QuickStats: React.FC = () => {
     
     return [
       {
-        title: 'Compra USD',
-        value: usdData ? `S/ ${usdData.buyRate.toFixed(2)}` : 'Cargando...',
-        change: '+0.05',
+        title: 'USD - Precio Mercado',
+        value: usdData?.marketRate ? `S/ ${usdData.marketRate.toFixed(4)}` : 'Cargando...',
+        change: usdData?.changePercent ? `${usdData.changePercent > 0 ? '+' : ''}${usdData.changePercent.toFixed(3)}%` : '+0.00%',
         icon: <DollarSign className="h-6 w-6 text-green-600" />,
-        trend: 'up',
+        trend: (usdData?.changePercent || 0) >= 0 ? 'up' : 'down',
+      },
+      {
+        title: 'Compra USD',
+        value: usdData ? `S/ ${usdData.buyRate.toFixed(4)}` : 'Cargando...',
+        change: usdData?.change ? `${usdData.change > 0 ? '+' : ''}${usdData.change.toFixed(4)}` : '+0.0000',
+        icon: <DollarSign className="h-6 w-6 text-green-600" />,
+        trend: (usdData?.change || 0) >= 0 ? 'up' : 'down',
       },
       {
         title: 'Venta USD',
-        value: usdData ? `S/ ${usdData.sellRate.toFixed(2)}` : 'Cargando...',
-        change: '+0.03',
+        value: usdData ? `S/ ${usdData.sellRate.toFixed(4)}` : 'Cargando...',
+        change: usdData?.change ? `${usdData.change > 0 ? '+' : ''}${usdData.change.toFixed(4)}` : '+0.0000',
         icon: <DollarSign className="h-6 w-6 text-green-600" />,
-        trend: 'up',
+        trend: (usdData?.change || 0) >= 0 ? 'up' : 'down',
       },
       {
-        title: 'Compra EUR',
-        value: eurData ? `S/ ${eurData.buyRate.toFixed(2)}` : 'Cargando...',
-        change: '-0.02',
+        title: 'EUR - Precio Mercado',
+        value: eurData?.marketRate ? `S/ ${eurData.marketRate.toFixed(4)}` : 'Cargando...',
+        change: eurData?.changePercent ? `${eurData.changePercent > 0 ? '+' : ''}${eurData.changePercent.toFixed(3)}%` : '+0.00%',
         icon: <Euro className="h-6 w-6 text-blue-600" />,
-        trend: 'down',
-      },
-      {
-        title: 'Venta EUR',
-        value: eurData ? `S/ ${eurData.sellRate.toFixed(2)}` : 'Cargando...',
-        change: '-0.01',
-        icon: <Euro className="h-6 w-6 text-blue-600" />,
-        trend: 'down',
+        trend: (eurData?.changePercent || 0) >= 0 ? 'up' : 'down',
       },
     ];
   };
