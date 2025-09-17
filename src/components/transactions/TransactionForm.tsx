@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { EnhancedButton } from '@/components/ui/enhanced-button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -104,64 +105,64 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onTransactionSubmit }
   };
   
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="flex space-x-4">
-        <Button 
+    <form onSubmit={handleSubmit} className="space-y-6 bg-card p-6 rounded-xl border shadow-soft">
+      <div className="flex space-x-3">
+        <EnhancedButton 
           type="button"
-          variant={type === 'compra' ? 'default' : 'outline'} 
+          variant={type === 'compra' ? 'success' : 'outline'} 
           className="flex-1"
           onClick={() => setType('compra')}
         >
           Compra
-        </Button>
-        <Button 
+        </EnhancedButton>
+        <EnhancedButton 
           type="button"
-          variant={type === 'venta' ? 'default' : 'outline'} 
+          variant={type === 'venta' ? 'destructive' : 'outline'} 
           className="flex-1"
           onClick={() => setType('venta')}
         >
           Venta
-        </Button>
+        </EnhancedButton>
       </div>
       
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Moneda</label>
-        <div className="flex space-x-4">
-          <Button 
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-foreground">Moneda</label>
+        <div className="flex space-x-3">
+          <EnhancedButton 
             type="button"
-            variant={currency === 'USD' ? 'default' : 'outline'} 
+            variant={currency === 'USD' ? 'usd' : 'outline'} 
             className="flex-1"
             onClick={() => setCurrency('USD')}
           >
             <DollarSign className="mr-2 h-4 w-4" />
             USD
-          </Button>
-          <Button 
+          </EnhancedButton>
+          <EnhancedButton 
             type="button"
-            variant={currency === 'EUR' ? 'default' : 'outline'} 
+            variant={currency === 'EUR' ? 'eur' : 'outline'} 
             className="flex-1"
             onClick={() => setCurrency('EUR')}
           >
             <Euro className="mr-2 h-4 w-4" />
             EUR
-          </Button>
+          </EnhancedButton>
         </div>
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div className="flex justify-between items-center">
-          <label className="block text-sm font-medium">Tasa de Cambio</label>
-          <Button 
+          <label className="block text-sm font-medium text-foreground">Tasa de Cambio</label>
+          <EnhancedButton 
             type="button" 
             variant="ghost" 
             size="sm" 
             onClick={loadRates}
-            disabled={loading}
-            className="h-8 px-2 text-xs"
+            loading={loading}
+            className="h-8 px-3 text-xs"
           >
-            <RefreshCw className={`mr-1 h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-            Actualizar Tasa
-          </Button>
+            <RefreshCw className="mr-1 h-3 w-3" />
+            Actualizar
+          </EnhancedButton>
         </div>
         <Input 
           type="number" 
@@ -169,33 +170,35 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onTransactionSubmit }
           value={rate} 
           onChange={e => setRate(e.target.value)} 
           placeholder="Ingrese la tasa de cambio"
+          className="border-input focus:border-accent transition-colors"
         />
       </div>
       
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Cantidad</label>
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-foreground">Cantidad</label>
         <Input 
           type="number" 
           step="0.01"
           value={amount} 
           onChange={e => setAmount(e.target.value)} 
           placeholder="Ingrese la cantidad"
+          className="border-input focus:border-accent transition-colors"
         />
       </div>
       
-      <div className="space-y-2">
-        <label className="block text-sm font-medium">Fecha</label>
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-foreground">Fecha</label>
         <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="w-full justify-start text-left font-normal"
+              className="w-full justify-start text-left font-normal hover:bg-accent hover:text-accent-foreground transition-colors"
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {format(date, 'PPP')}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0">
+          <PopoverContent className="w-auto p-0 shadow-strong">
             <Calendar
               mode="single"
               selected={date}
@@ -204,12 +207,15 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ onTransactionSubmit }
                 setCalendarOpen(false);
               }}
               initialFocus
+              className="pointer-events-auto"
             />
           </PopoverContent>
         </Popover>
       </div>
       
-      <Button type="submit" className="w-full">Registrar Transacción</Button>
+      <EnhancedButton type="submit" className="w-full" size="lg">
+        Registrar Transacción
+      </EnhancedButton>
     </form>
   );
 };

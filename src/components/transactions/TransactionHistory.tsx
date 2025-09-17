@@ -58,8 +58,9 @@ const TransactionHistory: React.FC<TransactionHistoryProps> = ({
                 variant="ghost" 
                 size="icon" 
                 onClick={() => onDeleteTransaction(transaction.id)}
+                className="hover:bg-finance-negative/10 hover:text-finance-negative transition-colors"
               >
-                <Trash2 className="h-4 w-4 text-red-500" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             </TableCell>
           </TableRow>

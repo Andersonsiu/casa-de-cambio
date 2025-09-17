@@ -39,28 +39,28 @@ const QuickStats: React.FC = () => {
         title: 'USD - Precio Mercado',
         value: usdData?.marketRate ? `S/ ${usdData.marketRate.toFixed(4)}` : 'Cargando...',
         change: usdData?.changePercent ? `${usdData.changePercent > 0 ? '+' : ''}${usdData.changePercent.toFixed(3)}%` : '+0.00%',
-        icon: <DollarSign className="h-6 w-6 text-green-600" />,
+        icon: <DollarSign className="h-6 w-6 text-finance-usd" />,
         trend: (usdData?.changePercent || 0) >= 0 ? 'up' : 'down',
       },
       {
         title: 'Compra USD',
         value: usdData ? `S/ ${usdData.buyRate.toFixed(4)}` : 'Cargando...',
         change: usdData?.change ? `${usdData.change > 0 ? '+' : ''}${usdData.change.toFixed(4)}` : '+0.0000',
-        icon: <DollarSign className="h-6 w-6 text-green-600" />,
+        icon: <DollarSign className="h-6 w-6 text-finance-usd" />,
         trend: (usdData?.change || 0) >= 0 ? 'up' : 'down',
       },
       {
         title: 'Venta USD',
         value: usdData ? `S/ ${usdData.sellRate.toFixed(4)}` : 'Cargando...',
         change: usdData?.change ? `${usdData.change > 0 ? '+' : ''}${usdData.change.toFixed(4)}` : '+0.0000',
-        icon: <DollarSign className="h-6 w-6 text-green-600" />,
+        icon: <DollarSign className="h-6 w-6 text-finance-usd" />,
         trend: (usdData?.change || 0) >= 0 ? 'up' : 'down',
       },
       {
         title: 'EUR - Precio Mercado',
         value: eurData?.marketRate ? `S/ ${eurData.marketRate.toFixed(4)}` : 'Cargando...',
         change: eurData?.changePercent ? `${eurData.changePercent > 0 ? '+' : ''}${eurData.changePercent.toFixed(3)}%` : '+0.00%',
-        icon: <Euro className="h-6 w-6 text-blue-600" />,
+        icon: <Euro className="h-6 w-6 text-finance-eur" />,
         trend: (eurData?.changePercent || 0) >= 0 ? 'up' : 'down',
       },
     ];
@@ -69,37 +69,47 @@ const QuickStats: React.FC = () => {
   const stats = getStats();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold">Tipos de Cambio Actuales</h2>
+        <h2 className="text-2xl font-bold text-foreground">Tipos de Cambio Actuales</h2>
         <Button 
           variant="outline" 
           size="sm" 
           onClick={loadRates} 
           disabled={loading}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 hover:bg-accent hover:text-accent-foreground transition-all duration-200"
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           Actualizar
         </Button>
       </div>
       
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              {stat.icon}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat, index) => (
+          <Card 
+            key={stat.title} 
+            className="group hover:shadow-medium transition-all duration-300 hover:-translate-y-1 animate-scale-in border-0 bg-gradient-card"
+            style={{ animationDelay: `${index * 100}ms` }}
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-3 space-y-0">
+              <CardTitle className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                {stat.title}
+              </CardTitle>
+              <div className="p-2 rounded-lg bg-background/50 group-hover:scale-110 transition-transform">
+                {stat.icon}
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+            <CardContent className="pt-0">
+              <div className="text-2xl font-bold text-foreground mb-2">{stat.value}</div>
               <div className="flex items-center">
                 {stat.trend === 'up' ? (
-                  <ArrowUpIcon className="mr-1 h-4 w-4 text-green-500" />
+                  <ArrowUpIcon className="mr-1 h-4 w-4 text-finance-positive" />
                 ) : (
-                  <ArrowDownIcon className="mr-1 h-4 w-4 text-red-500" />
+                  <ArrowDownIcon className="mr-1 h-4 w-4 text-finance-negative" />
                 )}
-                <span className={`text-xs ${stat.trend === 'up' ? 'text-green-500' : 'text-red-500'}`}>
+                <span className={`text-sm font-medium ${
+                  stat.trend === 'up' ? 'text-finance-positive' : 'text-finance-negative'
+                }`}>
                   {stat.change}
                 </span>
               </div>
