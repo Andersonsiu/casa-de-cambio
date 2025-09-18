@@ -66,9 +66,11 @@ export default {
 				// Finance themed semantic colors using HSL tokens
 				'finance-primary': 'hsl(var(--finance-primary))',
 				'finance-secondary': 'hsl(var(--finance-secondary))',
+				'finance-tertiary': 'hsl(var(--finance-tertiary))',
 				'finance-positive': 'hsl(var(--finance-positive))',
 				'finance-negative': 'hsl(var(--finance-negative))',
 				'finance-background': 'hsl(var(--finance-background))',
+				'finance-surface': 'hsl(var(--finance-surface))',
 				'finance-usd': 'hsl(var(--finance-usd))',
 				'finance-eur': 'hsl(var(--finance-eur))'
 			},
@@ -79,12 +81,15 @@ export default {
 			},
 			backgroundImage: {
 				'gradient-primary': 'var(--gradient-primary)',
-				'gradient-card': 'var(--gradient-card)'
+				'gradient-surface': 'var(--gradient-surface)',
+				'gradient-card': 'var(--gradient-card)',
+				'gradient-accent': 'var(--gradient-accent)'
 			},
 			boxShadow: {
 				'soft': 'var(--shadow-soft)',
 				'medium': 'var(--shadow-medium)',
-				'strong': 'var(--shadow-strong)'
+				'strong': 'var(--shadow-strong)',
+				'glow': 'var(--shadow-glow)'
 			},
 			keyframes: {
 				'fade-in': {
