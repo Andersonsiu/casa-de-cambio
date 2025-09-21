@@ -4,116 +4,63 @@
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* Clean Light Theme - Professional Finance Colors */
+    --background: 0 0% 100%;
+    --foreground: 225 15% 20%;
 
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 225 15% 20%;
 
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 225 15% 20%;
 
-    --primary: 200 100% 55%;
-    --primary-foreground: 240 10% 3.9%;
+    --primary: 220 100% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 220 13% 95%;
+    --secondary-foreground: 225 15% 20%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 220 13% 95%;
+    --muted-foreground: 215 25% 40%;
 
-    --accent: 120 100% 60%;
-    --accent-foreground: 240 10% 3.9%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 200 100% 55%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 220 100% 50%;
 
     --radius: 0.75rem;
 
-    /* Rich Finance themed colors */
-    --finance-primary: 200 100% 55%;
-    --finance-secondary: 280 100% 70%;
-    --finance-tertiary: 45 100% 65%;
-    --finance-positive: 120 100% 60%;
-    --finance-negative: 0 62.8% 50%;
-    --finance-background: 240 10% 3.9%;
-    --finance-surface: 240 3.7% 15.9%;
-    --finance-usd: 88 50% 53%;
-    --finance-eur: 245 100% 70%;
+    /* Professional Finance Color Palette */
+    --finance-primary: 220 100% 50%;     /* Professional Blue */
+    --finance-secondary: 220 13% 95%;    /* Light Gray Background */
+    --finance-tertiary: 45 93% 47%;      /* Gold/Yellow for highlights */
+    --finance-positive: 142 76% 36%;     /* Green for profits */
+    --finance-negative: 0 72% 51%;       /* Red for losses */
+    --finance-background: 0 0% 100%;     /* Pure white */
+    --finance-surface: 220 13% 98%;      /* Very light gray */
+    --finance-usd: 142 76% 36%;          /* USD Green */
+    --finance-eur: 220 100% 50%;         /* EUR Blue */
     
-    /* Rich Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--finance-primary)), hsl(var(--finance-secondary)));
-    --gradient-surface: linear-gradient(145deg, hsl(var(--finance-surface)), hsl(var(--muted)));
-    --gradient-card: linear-gradient(145deg, hsl(240 5% 6%), hsl(240 3.7% 15.9%));
-    --gradient-accent: linear-gradient(135deg, hsl(var(--finance-tertiary)), hsl(var(--finance-positive)));
-    
-    /* Enhanced Shadows */
-    --shadow-soft: 0 2px 10px hsl(var(--finance-primary) / 0.2);
-    --shadow-medium: 0 4px 20px hsl(var(--finance-primary) / 0.25);
-    --shadow-strong: 0 8px 30px hsl(var(--finance-primary) / 0.3);
-    --shadow-glow: 0 0 40px hsl(var(--finance-primary) / 0.4);
+    /* Clean Shadows - No gradients */
+    --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --shadow-strong: 0 10px 15px rgba(0, 0, 0, 0.1);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
 
-    --sidebar-background: 240 5% 6%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 200 100% 55%;
-    --sidebar-primary-foreground: 240 10% 3.9%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 200 100% 55%;
-  }
-
-  .dark {
-    --background: 0 0% 98%;
-    --foreground: 240 10% 3.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-
-    --primary: 200 100% 45%;
-    --primary-foreground: 0 0% 98%;
-
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 120 100% 50%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 200 100% 45%;
-    
-    /* Light mode colors */
-    --finance-primary: 200 100% 45%;
-    --finance-secondary: 280 100% 60%;
-    --finance-tertiary: 45 100% 55%;
-    --finance-positive: 120 100% 50%;
-    --finance-negative: 0 84.2% 60.2%;
-    --finance-background: 0 0% 98%;
-    --finance-surface: 0 0% 100%;
-    --finance-usd: 88 50% 53%;
-    --finance-eur: 245 100% 60%;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 200 100% 45%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    /* Sidebar Colors */
+    --sidebar-background: 220 13% 98%;
+    --sidebar-foreground: 225 15% 20%;
+    --sidebar-primary: 220 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 13% 95%;
+    --sidebar-accent-foreground: 225 15% 20%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 200 100% 45%;
+    --sidebar-ring: 220 100% 50%;
   }
 }
 
