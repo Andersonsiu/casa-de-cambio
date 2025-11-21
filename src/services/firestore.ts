@@ -1,15 +1,9 @@
-import {
-  collection,
-  getDocs,
-  doc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  getDoc,
-} from 'firebase/firestore';
+// src/services/firestore.ts
 import { db } from '@/integrations/firebase/client';
-import type { AppUser } from '@/types/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { AppUser } from '@/types/firestoreTypes';
 
+// Colección de usuarios
 const usersCollection = collection(db, 'users');
 
 // Lista todos los usuarios (para UserManagement)

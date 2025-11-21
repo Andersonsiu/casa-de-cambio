@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/integrations/firebase/client';
 import { getUserByUid } from '@/services/firestore';
-import type { AppRole } from '@/types/firestore';
+import type { AppRole } from '@/types/firestoreTypes';
 
 export type UserRole = AppRole | null;
 

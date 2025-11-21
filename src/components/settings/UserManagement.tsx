@@ -30,7 +30,7 @@ import {
 import { Plus, Trash2, User, Shield, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import type { AppRole, AppUser } from '@/types/firestore';
+import type { AppRole, AppUser } from '@/types/firestoreTypes';
 import {
   listUsers,
   createUserProfile,

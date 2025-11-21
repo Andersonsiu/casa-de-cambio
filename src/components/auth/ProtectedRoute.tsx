@@ -2,7 +2,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import type { AppRole } from '@/types/firestore';
+import type { AppRole } from '@/types/firestoreTypes';
 import { useUserRole } from '@/hooks/useUserRole';
 
 interface ProtectedRouteProps {

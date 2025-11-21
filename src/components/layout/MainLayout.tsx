@@ -14,7 +14,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { auth } from '@/integrations/firebase/client';
 import { useUserRole } from '@/hooks/useUserRole';
-import type { AppRole } from '@/types/firestore';
+import type { AppRole } from '@/types/firestoreTypes';
 import { signOut } from 'firebase/auth';
 
 interface MainLayoutProps {
