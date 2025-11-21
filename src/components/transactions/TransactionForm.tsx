@@ -1,4 +1,3 @@
-// src/components/transactions/TransactionForm.tsx
 import React, { useState, useEffect } from 'react';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
 import { Input } from '@/components/ui/input';
@@ -186,7 +185,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ transaction, onSucces
           <Input 
             type="text" 
             value={fullName}
-            onChange={e => setFullName(e.target.value)}
+            onChange={(e) => setFullName(e.target.value)}
             placeholder="Ingrese nombre y apellidos"
             className="border-input focus:border-accent transition-colors"
           />
@@ -304,7 +303,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ transaction, onSucces
       
       <EnhancedButton 
         type="submit" 
-        className="w-full" 
+        className="w-full py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all"
         size="lg"
         loading={loading}
       >
