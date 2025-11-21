@@ -29,9 +29,17 @@ type MenuItem = {
   roles: AppRole[];
 };
 
+const SIDEBAR_COLLAPSED_KEY = 'safeexchange:sidebar-collapsed';
+
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const [isCollapsed, setIsCollapsed] = React.useState(false);
+
+  // ⚙️ Lee el estado inicial desde localStorage (solo en navegador)
+  const [isCollapsed, setIsCollapsed] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    return stored === '1';
+  });
 
   const isMobile = useIsMobile();
   const navigate = useNavigate();
@@ -77,6 +85,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       ),
     [role]
   );
+
+  const handleToggleCollapsed = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+      }
+      return next;
+    });
+  };
 
   const handleLogout = async () => {
     try {
@@ -144,15 +162,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             )}
           </div>
 
+          {/* Desktop: botón de colapsar/expandir DENTRO de la sidebar */}
           {!isMobile && (
             <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
+              onClick={handleToggleCollapsed}
               className="p-2 rounded-lg hover:bg-sidebar-accent transition-colors group"
             >
               <Menu className="h-4 w-4 text-sidebar-foreground transition-transform" />
             </button>
           )}
 
+          {/* Mobile: botón para cerrar el offcanvas */}
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(false)}
@@ -178,7 +198,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 >
                   <button
                     type="button"
-                    onClick={() => navigate(item.path)}
+                    onClick={() => {
+                      navigate(item.path);
+                      // En móvil cerramos el panel; en desktop NO tocamos isCollapsed
+                      if (isMobile) setSidebarOpen(false);
+                    }}
                     className={`w-full text-left group relative flex items-center rounded-xl px-4 py-3.5 transition-all duration-200
                               ${isCollapsed ? 'justify-center' : 'gap-4'}
                               ${
@@ -245,6 +269,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         {/* Header */}
         <header className="bg-white border-b border-sidebar-border shadow-card">
           <div className="flex h-16 items-center justify-between px-6">
+            {/* Solo móvil: botón para abrir el offcanvas */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 rounded-xl hover:bg-finance-primary/10 transition-colors md:hidden group"
