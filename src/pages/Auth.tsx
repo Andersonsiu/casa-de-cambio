@@ -76,7 +76,7 @@ const Auth: React.FC = () => {
             <Shield className="h-8 w-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-finance-primary mb-2">
-            SafeExchange
+            Rojas - Casa de cambio
           </h1>
           <p className="text-muted-foreground">Sistema de Gestión de Cambios</p>
         </div>

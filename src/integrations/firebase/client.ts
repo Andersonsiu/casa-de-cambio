@@ -14,6 +14,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// 🔥 exports globales que usarás en toda la app
+// exports globales que usarás en toda la app
 export const db = getFirestore(app);
 export const auth = getAuth(app);
