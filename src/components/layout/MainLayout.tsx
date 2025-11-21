@@ -115,7 +115,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6">
+        <nav className="flex-1 px-4 py-6 flex flex-col justify-between">
           <div className="space-y-2">
             {menuItems.map((item, index) => {
               const isActiveItem = isActive(item.path);
@@ -125,17 +125,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 <div key={item.path} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
                   <a 
                     href={item.path} 
-                    className={`group relative flex items-center gap-4 rounded-xl px-4 py-3.5 transition-all duration-200
+                    className={`group relative flex items-center rounded-xl px-4 py-3.5 transition-all duration-200
+                              ${isCollapsed ? 'justify-center' : 'gap-4'}
                               ${isActiveItem 
                                 ? 'bg-finance-primary/10 text-finance-primary border border-finance-primary/30 shadow-soft' 
                                 : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-primary'
                               }`}
                   >
-                    <div className={`p-2 rounded-lg transition-all duration-200 ${isActiveItem ? 'bg-finance-primary/20' : 'group-hover:bg-finance-primary/10'}`}>
+                    <div className={`p-2 rounded-lg transition-all duration-200 flex-shrink-0 ${isActiveItem ? 'bg-finance-primary/20' : 'group-hover:bg-finance-primary/10'}`}>
                       <Icon className={`h-5 w-5 transition-all duration-200 ${isActiveItem ? item.color : 'text-sidebar-foreground'}`} />
                     </div>
                     {!isCollapsed && (
-                      <div className="flex flex-col">
+                      <div className="flex flex-col flex-1">
                         <span className="font-semibold text-sm">{item.label}</span>
                         {isActiveItem && <div className="w-8 h-0.5 bg-finance-primary rounded-full mt-1" />}
                       </div>
@@ -149,20 +150,19 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             })}
           </div>
 
+          {/* Logout Button */}
+          <div className="mt-4 pt-4 border-t border-sidebar-border">
+            <button 
+              onClick={handleLogout}
+              className={`flex w-full items-center rounded-xl px-4 py-3 text-sidebar-foreground hover:bg-finance-negative/10 hover:text-finance-negative transition-all duration-200 group border border-transparent hover:border-finance-negative/20 ${isCollapsed ? 'justify-center' : 'gap-3'}`}
+            >
+              <div className="p-1.5 rounded-lg group-hover:bg-finance-negative/20 transition-colors flex-shrink-0">
+                <LogOut className="h-4 w-4" />
+              </div>
+              {!isCollapsed && <span className="font-medium">Cerrar Sesión</span>}
+            </button>
+          </div>
         </nav>
-
-        {/* Footer */}
-        <div className="border-t border-sidebar-border p-4">
-          <button 
-            onClick={handleLogout}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sidebar-foreground hover:bg-finance-negative/10 hover:text-finance-negative transition-all duration-200 group border border-transparent hover:border-finance-negative/20 ${isCollapsed ? 'justify-center' : ''}`}
-          >
-            <div className="p-1.5 rounded-lg group-hover:bg-finance-negative/20 transition-colors">
-              <LogOut className="h-4 w-4 transition-transform" />
-            </div>
-            {!isCollapsed && <span className="font-medium">Cerrar Sesión</span>}
-          </button>
-        </div>
       </div>
 
       {/* Main content */}
