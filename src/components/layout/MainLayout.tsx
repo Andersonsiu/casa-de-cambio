@@ -1,8 +1,9 @@
 import React from 'react';
-import { Menu, FileText, DollarSign, BarChart, Settings, LogOut, Shield, TrendingUp, Wallet, CreditCard, Users, Bell } from 'lucide-react';
+import { Menu, DollarSign, BarChart, Settings, LogOut, Shield, TrendingUp } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -15,9 +16,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = () => {
-    toast.success('Sesión cerrada exitosamente');
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success('Sesión cerrada exitosamente');
+      navigate('/auth');
+    } catch (error) {
+      toast.error('Error al cerrar sesión');
+    }
   };
 
   const menuItems = [
@@ -107,27 +113,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           )}
         </div>
 
-        {/* Stats Overview */}
-        {!isCollapsed && (
-          <div className="px-4 py-4 border-b border-sidebar-border">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-finance-positive/10 p-3 rounded-xl border border-finance-positive/20">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-finance-positive" />
-                  <span className="text-xs font-medium text-sidebar-foreground">Ganancia</span>
-                </div>
-                <p className="text-sm font-bold text-finance-positive mt-1">+$2,450</p>
-              </div>
-              <div className="bg-finance-primary/10 p-3 rounded-xl border border-finance-primary/20">
-                <div className="flex items-center gap-2">
-                  <Wallet className="h-4 w-4 text-finance-primary" />
-                  <span className="text-xs font-medium text-sidebar-foreground">Caja</span>
-                </div>
-                <p className="text-sm font-bold text-finance-primary mt-1">$15,850</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6">
@@ -164,39 +149,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             })}
           </div>
 
-          {/* Quick Actions */}
-          {!isCollapsed && (
-            <div className="mt-8 pt-6 border-t border-sidebar-border">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-2">
-                Acciones Rápidas
-              </p>
-              <div className="space-y-2">
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-sidebar-foreground hover:bg-finance-positive/10 hover:text-finance-positive rounded-xl transition-all duration-200 group border border-transparent hover:border-finance-positive/20">
-                  <CreditCard className="h-4 w-4 transition-transform" />
-                  Nueva Transacción
-                </button>
-                <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-sidebar-foreground hover:bg-finance-primary/10 hover:text-finance-primary rounded-xl transition-all duration-200 group border border-transparent hover:border-finance-primary/20">
-                  <Users className="h-4 w-4 transition-transform" />
-                  Gestionar Clientes
-                </button>
-              </div>
-            </div>
-          )}
         </nav>
 
         {/* Footer */}
         <div className="border-t border-sidebar-border p-4">
-          {/* Notifications */}
-          {!isCollapsed && (
-            <div className="flex items-center justify-between mb-4 px-2">
-              <span className="text-xs font-medium text-muted-foreground">Notificaciones</span>
-              <div className="flex items-center gap-1">
-                <Bell className="h-4 w-4 text-finance-primary" />
-                <span className="text-xs bg-finance-negative text-white px-1.5 py-0.5 rounded-full">3</span>
-              </div>
-            </div>
-          )}
-          
           <button 
             onClick={handleLogout}
             className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sidebar-foreground hover:bg-finance-negative/10 hover:text-finance-negative transition-all duration-200 group border border-transparent hover:border-finance-negative/20 ${isCollapsed ? 'justify-center' : ''}`}
@@ -222,18 +178,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             </button>
             
             <div className="ml-auto flex items-center gap-4">
-              {/* Quick Stats in Header */}
-              <div className="hidden sm:flex items-center gap-4 px-4 py-2 bg-finance-surface rounded-xl border border-finance-primary/10">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-finance-positive rounded-full" />
-                  <span className="text-xs font-medium text-muted-foreground">USD: 3.75</span>
-                </div>
-                <div className="w-px h-4 bg-border" />
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-finance-eur rounded-full" />
-                  <span className="text-xs font-medium text-muted-foreground">EUR: 4.12</span>
-                </div>
-              </div>
               
               {/* User Profile */}
               <div className="flex items-center gap-3 px-4 py-2 rounded-xl bg-finance-surface border border-finance-primary/20">
