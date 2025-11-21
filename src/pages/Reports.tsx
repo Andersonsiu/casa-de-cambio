@@ -17,6 +17,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart as RePieChart, 
   Pie, Cell, Legend 
 } from 'recharts';
+import { toast } from 'sonner';
 
 // Datos simulados para gráficos
 const transactionData = [
@@ -49,9 +50,47 @@ const Reports: React.FC = () => {
     console.log('Generando reporte:', { reportType, startDate, endDate, initialBalance });
   };
   
-  const downloadReport = () => {
-    // En una aplicación real, aquí se descargaría el reporte en formato Excel
-    alert('Esta función descargaría un informe en Excel en una aplicación completa.');
+  const downloadReport = async () => {
+    try {
+      const XLSX = await import('xlsx');
+      
+      // Preparar datos para Excel
+      const reportData = [
+        ['SafeExchange - Reporte Financiero'],
+        ['Periodo:', `${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`],
+        ['Tipo de Reporte:', reportType],
+        ['Saldo Inicial:', `S/ ${initialBalance}`],
+        [],
+        ['Transacciones por Día'],
+        ['Día', 'Compras', 'Ventas'],
+        ...transactionData.map(item => [item.name, item.compras, item.ventas]),
+        [],
+        ['Distribución por Moneda'],
+        ['Moneda', 'Porcentaje'],
+        ...currencyData.map(item => [item.name, `${item.value}%`]),
+        [],
+        ['Métricas Clave'],
+        ['Métrica', 'Valor'],
+        ['Total Transacciones', '124'],
+        ['Ganancia Total', 'S/ 5,280.45'],
+        ['Margen Promedio', '4.2%'],
+        ['Volumen Negociado', '$ 125,430']
+      ];
+
+      // Crear libro de trabajo
+      const ws = XLSX.utils.aoa_to_sheet(reportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+
+      // Descargar archivo
+      const fileName = `Reporte_${format(startDate, 'ddMMyyyy')}_${format(endDate, 'ddMMyyyy')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      toast.success('Reporte exportado exitosamente');
+    } catch (error) {
+      console.error('Error al exportar:', error);
+      toast.error('Error al exportar el reporte');
+    }
   };
   
   return (
