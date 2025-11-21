@@ -1,3 +1,4 @@
+// src/components/transactions/TransactionForm.tsx
 import React, { useState, useEffect } from 'react';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,15 @@ import { format } from 'date-fns';
 import { Calendar as CalendarIcon, RefreshCw, DollarSign, Euro } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchExchangeRates, ExchangeRateData } from '@/services/exchangeRateService';
-import { supabase } from '@/integrations/supabase/client';
+
+//  Firebase
+import { db, auth } from '@/integrations/firebase/client';
+import {
+  addDoc,
+  collection,
+  doc,
+  updateDoc,
+} from 'firebase/firestore';
 
 interface TransactionFormProps {
   transaction?: {
@@ -27,8 +36,8 @@ interface TransactionFormProps {
 const TransactionForm: React.FC<TransactionFormProps> = ({ transaction, onSuccess }) => {
   const [type, setType] = useState<'compra' | 'venta'>(transaction?.type || 'compra');
   const [currency, setCurrency] = useState<'USD' | 'EUR'>(transaction?.currency || 'USD');
-  const [amount, setAmount] = useState<string>(transaction?.amount.toString() || '');
-  const [rate, setRate] = useState<string>(transaction?.rate.toString() || '');
+  const [amount, setAmount] = useState<string>(transaction ? transaction.amount.toString() : '');
+  const [rate, setRate] = useState<string>(transaction ? transaction.rate.toString() : '');
   const [date, setDate] = useState<Date>(transaction?.date || new Date());
   const [dni, setDni] = useState<string>(transaction?.dni || '');
   const [fullName, setFullName] = useState<string>(transaction?.full_name || '');
@@ -105,19 +114,18 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ transaction, onSucces
       return;
     }
     
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      toast.error('Debe iniciar sesión para registrar transacciones');
+      return;
+    }
+
     setLoading(true);
     
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast.error('Debe iniciar sesión para registrar transacciones');
-        return;
-      }
-
       const total = amountNum * rateNum;
       const transactionData = {
-        user_id: user.id,
+        user_id: currentUser.uid,
         dni,
         full_name: fullName,
         type,
@@ -125,30 +133,25 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ transaction, onSucces
         amount: amountNum,
         rate: rateNum,
         total,
-        transaction_date: format(date, 'yyyy-MM-dd')
+        transaction_date: format(date, 'yyyy-MM-dd'),
+        created_at: transaction ? transaction.date.toISOString() : new Date().toISOString(),
       };
 
-      if (transaction) {
-        // Update existing transaction
-        const { error } = await supabase
-          .from('transactions')
-          .update(transactionData)
-          .eq('id', transaction.id);
+      const transactionsCol = collection(db, 'transactions');
 
-        if (error) throw error;
+      if (transaction) {
+        // 🔄 Actualizar transacción existente en Firestore
+        const ref = doc(db, 'transactions', transaction.id);
+        await updateDoc(ref, transactionData as any);
         toast.success('Transacción actualizada exitosamente');
       } else {
-        // Insert new transaction
-        const { error } = await supabase
-          .from('transactions')
-          .insert([transactionData]);
-
-        if (error) throw error;
+        // ➕ Insertar nueva transacción en Firestore
+        await addDoc(transactionsCol, transactionData as any);
         toast.success('Transacción registrada exitosamente');
       }
       
-      // Reset form if it's a new transaction
       if (!transaction) {
+        // reset solo si era nueva
         setAmount('');
         setDni('');
         setFullName('');
@@ -157,7 +160,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ transaction, onSucces
       onSuccess?.();
     } catch (error: any) {
       console.error('Error al guardar transacción:', error);
-      toast.error(error.message || 'Error al guardar transacción');
+      toast.error(error?.message || 'Error al guardar transacción');
     } finally {
       setLoading(false);
     }
@@ -289,8 +292,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ transaction, onSucces
             <Calendar
               mode="single"
               selected={date}
-              onSelect={(date) => {
-                date && setDate(date);
+              onSelect={(d) => {
+                if (d) setDate(d);
                 setCalendarOpen(false);
               }}
               initialFocus

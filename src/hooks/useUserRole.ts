@@ -1,45 +1,57 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+// src/hooks/useUserRole.ts
+import { useEffect, useState } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '@/integrations/firebase/client';
+import { getUserByUid } from '@/services/firestore';
+import type { AppRole } from '@/types/firestore';
 
-export type UserRole = 'admin' | 'operator' | null;
+export type UserRole = AppRole | null;
 
 export const useUserRole = () => {
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [role, setRole] = useState<UserRole>(null);
+  const [active, setActive] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchRole = async () => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      setFirebaseUser(user);
+
+      if (!user) {
+        setRole(null);
+        setActive(null);
+        setLoading(false);
+        return;
+      }
+
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setRole(null);
-          setLoading(false);
-          return;
-        }
-
-        const { data, error } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .single();
-
-        if (error) {
-          console.error('Error fetching role:', error);
-          setRole('operator'); // Default to operator
+        const profile = await getUserByUid(user.uid);
+        if (profile) {
+          setRole(profile.role);
+          setActive(profile.active);
         } else {
-          setRole(data?.role as UserRole);
+          // si no hay perfil, lo tratamos como operador activo por defecto
+          setRole('operator');
+          setActive(true);
         }
-      } catch (error) {
-        console.error('Error:', error);
+      } catch (e) {
+        console.error(e);
         setRole('operator');
+        setActive(true);
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    fetchRole();
+    return () => unsub();
   }, []);
 
-  return { role, loading, isAdmin: role === 'admin', isOperator: role === 'operator' };
+  return {
+    firebaseUser,
+    role,
+    active,
+    loading,
+    isAdmin: role === 'admin',
+    isOperator: role === 'operator',
+  };
 };

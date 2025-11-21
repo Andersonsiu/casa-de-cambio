@@ -121,39 +121,6 @@ const Index = () => {
           </div>
         </div>
       </div>
-      
-      {/* Advanced Calculators */}
-      <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
-        <div className="animate-fade-in" style={{ animationDelay: '1000ms' }}>
-          <div className="bg-white rounded-2xl p-6 border border-finance-usd/20 shadow-card">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-finance-usd/10 rounded-lg flex items-center justify-center border border-finance-usd/20">
-                <span className="text-lg">🧮</span>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-foreground">Calculadora de Caja</h2>
-                <p className="text-sm text-muted-foreground">Gestión de fondos</p>
-              </div>
-            </div>
-            <CashCalculator />
-          </div>
-        </div>
-        
-        <div className="animate-fade-in" style={{ animationDelay: '1200ms' }}>
-          <div className="bg-white rounded-2xl p-6 border border-finance-eur/20 shadow-card">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-finance-eur/10 rounded-lg flex items-center justify-center border border-finance-eur/20">
-                <span className="text-lg">📈</span>
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-foreground">Análisis de Rentabilidad</h2>
-                <p className="text-sm text-muted-foreground">Optimización de ganancias</p>
-              </div>
-            </div>
-            <ProfitabilityCalculator />
-          </div>
-        </div>
-      </div>
     </MainLayout>
   );
 };

@@ -1,3 +1,4 @@
+// src/components/transactions/TransactionList.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,9 +22,19 @@ import {
 import { Pencil, Trash2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+
 import { useUserRole } from '@/hooks/useUserRole';
 import TransactionForm from './TransactionForm';
+
+import {
+  collection,
+  getDocs,
+  orderBy,
+  query,
+  deleteDoc,
+  doc,
+} from 'firebase/firestore';
+import { db } from '@/integrations/firebase/client';
 
 interface Transaction {
   id: string;
@@ -34,8 +45,8 @@ interface Transaction {
   amount: number;
   rate: number;
   total: number;
-  transaction_date: string;
-  created_at: string;
+  transaction_date: string; // ISO o string fecha
+  created_at: string;       // ISO o timestamp
 }
 
 const TransactionList: React.FC = () => {
@@ -49,20 +60,30 @@ const TransactionList: React.FC = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Colección "transactions" en Firestore
+      const ref = collection(db, 'transactions');
+      const q = query(ref, orderBy('created_at', 'desc'));
+      const snap = await getDocs(q);
 
-      if (error) throw error;
-      const typedData = (data || []).map(t => ({
-        ...t,
-        type: t.type as 'compra' | 'venta',
-        currency: t.currency as 'USD' | 'EUR'
-      }));
+      const typedData: Transaction[] = snap.docs.map((d) => {
+        const data = d.data() as any;
+        return {
+          id: d.id,
+          dni: data.dni,
+          full_name: data.full_name,
+          type: data.type as 'compra' | 'venta',
+          currency: data.currency as 'USD' | 'EUR',
+          amount: Number(data.amount),
+          rate: Number(data.rate),
+          total: Number(data.total),
+          transaction_date: data.transaction_date,
+          created_at: data.created_at,
+        };
+      });
+
       setTransactions(typedData);
       setFilteredTransactions(typedData);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Error al cargar transacciones');
     } finally {
@@ -76,11 +97,12 @@ const TransactionList: React.FC = () => {
 
   useEffect(() => {
     if (searchTerm) {
-      const filtered = transactions.filter(t =>
-        t.dni.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        t.currency.toLowerCase().includes(searchTerm.toLowerCase())
+      const term = searchTerm.toLowerCase();
+      const filtered = transactions.filter((t) =>
+        t.dni.toLowerCase().includes(term) ||
+        t.full_name.toLowerCase().includes(term) ||
+        t.type.toLowerCase().includes(term) ||
+        t.currency.toLowerCase().includes(term)
       );
       setFilteredTransactions(filtered);
     } else {
@@ -97,15 +119,10 @@ const TransactionList: React.FC = () => {
     if (!confirm('¿Está seguro de eliminar esta transacción?')) return;
 
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await deleteDoc(doc(db, 'transactions', id));
       toast.success('Transacción eliminada');
       fetchTransactions();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error deleting transaction:', error);
       toast.error('Error al eliminar transacción');
     }
@@ -131,9 +148,13 @@ const TransactionList: React.FC = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Cargando...</div>
+            <div className="text-center py-8 text-muted-foreground">
+              Cargando...
+            </div>
           ) : filteredTransactions.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No hay transacciones</div>
+            <div className="text-center py-8 text-muted-foreground">
+              No hay transacciones
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -153,18 +174,35 @@ const TransactionList: React.FC = () => {
                 <TableBody>
                   {filteredTransactions.map((transaction) => (
                     <TableRow key={transaction.id}>
-                      <TableCell className="font-medium">{transaction.dni}</TableCell>
+                      <TableCell className="font-medium">
+                        {transaction.dni}
+                      </TableCell>
                       <TableCell>{transaction.full_name}</TableCell>
                       <TableCell>
-                        <Badge variant={transaction.type === 'compra' ? 'default' : 'destructive'}>
+                        <Badge
+                          variant={
+                            transaction.type === 'compra'
+                              ? 'default'
+                              : 'destructive'
+                          }
+                        >
                           {transaction.type.toUpperCase()}
                         </Badge>
                       </TableCell>
                       <TableCell>{transaction.currency}</TableCell>
                       <TableCell>{transaction.amount.toFixed(2)}</TableCell>
                       <TableCell>{transaction.rate.toFixed(4)}</TableCell>
-                      <TableCell className="font-medium">{transaction.total.toFixed(2)}</TableCell>
-                      <TableCell>{format(new Date(transaction.transaction_date), 'dd/MM/yyyy')}</TableCell>
+                      <TableCell className="font-medium">
+                        {transaction.total.toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        {transaction.transaction_date
+                          ? format(
+                              new Date(transaction.transaction_date),
+                              'dd/MM/yyyy'
+                            )
+                          : '-'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
@@ -195,7 +233,10 @@ const TransactionList: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={!!editingTransaction} onOpenChange={() => setEditingTransaction(null)}>
+      <Dialog
+        open={!!editingTransaction}
+        onOpenChange={() => setEditingTransaction(null)}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar Transacción</DialogTitle>
