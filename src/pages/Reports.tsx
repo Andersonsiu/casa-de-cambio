@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Select, SelectContent, SelectItem, 
   SelectTrigger, SelectValue 
@@ -44,15 +45,55 @@ const Reports: React.FC = () => {
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
   const [initialBalance, setInitialBalance] = useState('1000');
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const fetchTransactions = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .gte('transaction_date', format(startDate, 'yyyy-MM-dd'))
+        .lte('transaction_date', format(endDate, 'yyyy-MM-dd'))
+        .order('transaction_date', { ascending: false });
+
+      if (error) throw error;
+      setTransactions(data || []);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      toast.error('Error al cargar transacciones');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
   
   const generateReport = () => {
-    // En una aplicación real, aquí se procesarían los datos y se generaría el reporte
-    console.log('Generando reporte:', { reportType, startDate, endDate, initialBalance });
+    fetchTransactions();
+    toast.success('Reporte generado exitosamente');
   };
   
   const downloadReport = async () => {
     try {
       const XLSX = await import('xlsx');
+      
+      const filteredTransactions = searchTerm
+        ? transactions.filter(t =>
+            t.dni.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            t.currency.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        : transactions;
+
+      // Calcular totales
+      const totalTransactions = filteredTransactions.length;
+      const totalAmount = filteredTransactions.reduce((sum, t) => sum + parseFloat(t.total), 0);
       
       // Preparar datos para Excel
       const reportData = [
@@ -61,20 +102,23 @@ const Reports: React.FC = () => {
         ['Tipo de Reporte:', reportType],
         ['Saldo Inicial:', `S/ ${initialBalance}`],
         [],
-        ['Transacciones por Día'],
-        ['Día', 'Compras', 'Ventas'],
-        ...transactionData.map(item => [item.name, item.compras, item.ventas]),
-        [],
-        ['Distribución por Moneda'],
-        ['Moneda', 'Porcentaje'],
-        ...currencyData.map(item => [item.name, `${item.value}%`]),
+        ['Transacciones'],
+        ['DNI', 'Nombre', 'Tipo', 'Moneda', 'Cantidad', 'Tasa', 'Total (S/)', 'Fecha'],
+        ...filteredTransactions.map(t => [
+          t.dni,
+          t.full_name,
+          t.type.toUpperCase(),
+          t.currency,
+          t.amount,
+          t.rate,
+          t.total,
+          format(new Date(t.transaction_date), 'dd/MM/yyyy')
+        ]),
         [],
         ['Métricas Clave'],
         ['Métrica', 'Valor'],
-        ['Total Transacciones', '124'],
-        ['Ganancia Total', 'S/ 5,280.45'],
-        ['Margen Promedio', '4.2%'],
-        ['Volumen Negociado', '$ 125,430']
+        ['Total Transacciones', totalTransactions],
+        ['Volumen Total', `S/ ${totalAmount.toFixed(2)}`]
       ];
 
       // Crear libro de trabajo
@@ -110,11 +154,21 @@ const Reports: React.FC = () => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Configuración del Reporte</CardTitle>
-            <CardDescription>Seleccione los parámetros para generar su reporte</CardDescription>
+            <CardTitle>Filtro</CardTitle>
+            <CardDescription>Seleccione el rango de fechas y busque</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Buscar</label>
+                <Input 
+                  type="text" 
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="DNI, nombre, tipo..."
+                  className="border-input focus:border-accent transition-colors"
+                />
+              </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium">Tipo de Reporte</label>
                 <Select value={reportType} onValueChange={setReportType}>

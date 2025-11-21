@@ -3,12 +3,12 @@ import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchExchangeRates, ExchangeRateData } from '@/services/exchangeRateService';
+import { useUserRole } from '@/hooks/useUserRole';
 
 // Import refactored components
 import ExchangeRateSettings from '@/components/settings/ExchangeRateSettings';
 import ApiConfigSettings from '@/components/settings/ApiConfigSettings';
 import UserManagement from '@/components/settings/UserManagement';
-import NotificationSettings from '@/components/settings/NotificationSettings';
 import SecuritySettings from '@/components/settings/SecuritySettings';
 
 // Interface for User
@@ -25,6 +25,7 @@ const Settings: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [apiEndpoint, setApiEndpoint] = useState('');
+  const { isAdmin } = useUserRole();
   
   const [users, setUsers] = useState<User[]>([
     {
@@ -35,12 +36,6 @@ const Settings: React.FC = () => {
       active: true
     }
   ]);
-  
-  const [notifications, setNotifications] = useState({
-    emailAlerts: true,
-    rateChanges: true,
-    dailyReports: false
-  });
   
   const [security, setSecurity] = useState({
     twoFactor: false,
@@ -79,11 +74,10 @@ const Settings: React.FC = () => {
       </div>
       
       <Tabs defaultValue="exchange-rates" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 mb-6">
+        <TabsList className="grid w-full grid-cols-4 mb-6">
           <TabsTrigger value="exchange-rates">Tasas de Cambio</TabsTrigger>
           <TabsTrigger value="api-config">API Externa</TabsTrigger>
-          <TabsTrigger value="users">Usuarios</TabsTrigger>
-          <TabsTrigger value="notifications">Notificaciones</TabsTrigger>
+          {isAdmin && <TabsTrigger value="users">Usuarios</TabsTrigger>}
           <TabsTrigger value="security">Seguridad</TabsTrigger>
         </TabsList>
         
@@ -105,16 +99,11 @@ const Settings: React.FC = () => {
           />
         </TabsContent>
         
-        <TabsContent value="users">
-          <UserManagement users={users} setUsers={setUsers} />
-        </TabsContent>
-        
-        <TabsContent value="notifications">
-          <NotificationSettings 
-            notifications={notifications}
-            setNotifications={setNotifications}
-          />
-        </TabsContent>
+        {isAdmin && (
+          <TabsContent value="users">
+            <UserManagement users={users} setUsers={setUsers} />
+          </TabsContent>
+        )}
         
         <TabsContent value="security">
           <SecuritySettings 
