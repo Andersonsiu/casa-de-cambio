@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
 import { Calculator, DollarSign, Euro, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { db } from '@/integrations/firebase/client';
+import { collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
+import { auth } from '@/integrations/firebase/client';
 
 interface CashCalculation {
   initialCashUSD: number;
@@ -18,55 +21,119 @@ interface CashCalculation {
 }
 
 const CashCalculator: React.FC = () => {
-  const [initialCashUSD, setInitialCashUSD] = useState<string>('');
-  const [initialCashEUR, setInitialCashEUR] = useState<string>('');
-  const [expenses, setExpenses] = useState<string>('');
+  const [initialCashUSD, setInitialCashUSD] = useState<string>('0.00');
+  const [initialCashEUR, setInitialCashEUR] = useState<string>('0.00');
+  const [expenses, setExpenses] = useState<string>('0.00');
   const [results, setResults] = useState<CashCalculation | null>(null);
   const [loading, setLoading] = useState(false);
+  const [transactions, setTransactions] = useState<any[]>([]);
+
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  const userUID = auth.currentUser?.uid;
+
+  useEffect(() => {
+    if (!userUID) return; // Si no hay un usuario autenticado, no hacemos la consulta
+
+    const fetchTransactions = async () => {
+      setLoading(true);
+      try {
+        const transactionsRef = collection(db, 'transactions');
+        let q = query(
+          transactionsRef,
+          where('user_id', '==', userUID)
+        );
+
+        // Si se ha seleccionado un rango de fechas, lo aplicamos en la consulta
+        if (startDate) {
+          const startTimestamp = Timestamp.fromDate(new Date(startDate));
+          q = query(q, where('transaction_date', '>=', startTimestamp));
+        }
+        if (endDate) {
+          const endTimestamp = Timestamp.fromDate(new Date(endDate));
+          q = query(q, where('transaction_date', '<=', endTimestamp));
+        }
+
+        const querySnapshot = await getDocs(q);
+        const transactionData = querySnapshot.docs.map(doc => doc.data());
+        setTransactions(transactionData);
+        calculateInitialBalances(transactionData);
+      } catch (error) {
+        toast.error('Error al cargar las transacciones');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTransactions();
+  }, [userUID, startDate, endDate]);
+
+  const calculateInitialBalances = (transactions: any[]) => {
+    let totalUSD = 0;
+    let totalEUR = 0;
+
+    transactions.forEach(transaction => {
+      const transactionAmount = parseFloat(transaction.amount);
+      const transactionRate = parseFloat(transaction.rate);
+      const transactionType = transaction.type;
+      const transactionCurrency = transaction.currency;
+
+      if (transactionCurrency === 'USD') {
+        if (transactionType === 'compra') {
+          totalUSD += transactionAmount * transactionRate;
+        } else if (transactionType === 'venta') {
+          totalUSD -= transactionAmount * transactionRate;
+        }
+      } else if (transactionCurrency === 'EUR') {
+        if (transactionType === 'compra') {
+          totalEUR += transactionAmount * transactionRate;
+        } else if (transactionType === 'venta') {
+          totalEUR -= transactionAmount * transactionRate;
+        }
+      }
+    });
+
+    setInitialCashUSD(totalUSD.toFixed(2));
+    setInitialCashEUR(totalEUR.toFixed(2));
+  };
 
   const calculateCash = async () => {
-    if (!initialCashUSD || !initialCashEUR || !expenses) {
+    if (!expenses) {
       toast.error('Por favor complete todos los campos');
       return;
     }
 
     setLoading(true);
-    
+
     try {
-      // Simulated calculation - In a real app, this would come from transaction data
-      const initialUSD = parseFloat(initialCashUSD);
-      const initialEUR = parseFloat(initialCashEUR);
       const expensesAmount = parseFloat(expenses);
-      
-      // Mock calculations based on the Python logic
+      let totalUSD = parseFloat(initialCashUSD);
+      let totalEUR = parseFloat(initialCashEUR);
+
       const mockBuyMarginUSD = 3.75;
       const mockSellMarginUSD = 3.78;
       const mockBuyMarginEUR = 4.10;
       const mockSellMarginEUR = 4.15;
-      
+
       const marginDifferenceUSD = mockSellMarginUSD - mockBuyMarginUSD;
       const marginDifferenceEUR = mockSellMarginEUR - mockBuyMarginEUR;
-      
-      const profitSolesUSD = (initialUSD * marginDifferenceUSD) - expensesAmount;
-      const profitSolesEUR = (initialEUR * marginDifferenceEUR) - expensesAmount;
-      
-      const profitUSD = profitSolesUSD / mockSellMarginUSD;
-      const profitEUR = profitSolesEUR / mockSellMarginEUR;
-      
-      const finalUSD = initialUSD + profitUSD;
-      const finalEUR = initialEUR + profitEUR;
-      
+
+      const profitSolesUSD = (totalUSD * marginDifferenceUSD) - expensesAmount;
+      const profitSolesEUR = (totalEUR * marginDifferenceEUR) - expensesAmount;
+
+      const profitSoles = profitSolesUSD + profitSolesEUR;
+
       const calculation: CashCalculation = {
-        initialCashUSD: initialUSD,
-        initialCashEUR: initialEUR,
+        initialCashUSD: totalUSD,
+        initialCashEUR: totalEUR,
         expenses: expensesAmount,
-        finalCashUSD: finalUSD,
-        finalCashEUR: finalEUR,
-        profitUSD,
-        profitEUR,
-        profitSoles: profitSolesUSD + profitSolesEUR
+        finalCashUSD: totalUSD + profitSolesUSD / mockSellMarginUSD,
+        finalCashEUR: totalEUR + profitSolesEUR / mockSellMarginEUR,
+        profitUSD: profitSolesUSD,
+        profitEUR: profitSolesEUR,
+        profitSoles,
       };
-      
+
       setResults(calculation);
       toast.success('Cálculo de caja realizado exitosamente');
     } catch (error) {
@@ -88,55 +155,63 @@ const CashCalculator: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="initial-usd" className="text-sm font-medium">
-                Caja Inicial USD
-              </Label>
+              <Label htmlFor="initial-usd">Saldo USD</Label>
               <Input
                 id="initial-usd"
                 type="number"
                 step="0.01"
                 value={initialCashUSD}
-                onChange={(e) => setInitialCashUSD(e.target.value)}
-                placeholder="0.00"
+                disabled
                 className="transition-all duration-200 focus:border-finance-usd"
               />
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="initial-eur" className="text-sm font-medium">
-                Caja Inicial EUR
-              </Label>
+              <Label htmlFor="initial-eur">Saldo EUR</Label>
               <Input
                 id="initial-eur"
                 type="number"
                 step="0.01"
                 value={initialCashEUR}
-                onChange={(e) => setInitialCashEUR(e.target.value)}
-                placeholder="0.00"
+                disabled
                 className="transition-all duration-200 focus:border-finance-eur"
               />
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="expenses" className="text-sm font-medium">
-                Gastos (S/)
-              </Label>
+              <Label htmlFor="expenses">Gastos (S/)</Label>
               <Input
                 id="expenses"
                 type="number"
                 step="0.01"
                 value={expenses}
                 onChange={(e) => setExpenses(e.target.value)}
-                placeholder="0.00"
                 className="transition-all duration-200 focus:border-accent"
               />
             </div>
           </div>
-          
+
+          {/* Filtros de fecha */}
+          <div className="space-y-2 mt-4">
+            <Label>Fecha de Inicio</Label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+
+            <Label>Fecha de Fin</Label>
+            <Input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+
           <EnhancedButton 
             onClick={calculateCash} 
             loading={loading}
-            className="w-full"
+            className="w-full bg-blue-500 text-white hover:bg-blue-700 transition-all duration-200"
             size="lg"
           >
             <Calculator className="mr-2 h-4 w-4" />
