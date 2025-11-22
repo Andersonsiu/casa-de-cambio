@@ -29,7 +29,7 @@ type MenuItem = {
   roles: AppRole[];
 };
 
-const SIDEBAR_COLLAPSED_KEY = 'safeexchange:sidebar-collapsed';
+const SIDEBAR_COLLAPSED_KEY = 'Rojas - Casa de cambio:sidebar-collapsed';
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -156,10 +156,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             {!isCollapsed && (
               <div className="flex flex-col">
                 <h1 className="text-xl font-bold text-finance-primary">
-                  SafeExchange
+                  Rojas 
                 </h1>
                 <span className="text-xs text-muted-foreground font-medium">
-                  Exchange Platform
+                  Casa de cambio
                 </span>
               </div>
             )}

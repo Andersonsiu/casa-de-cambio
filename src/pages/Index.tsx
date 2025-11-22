@@ -20,7 +20,7 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-4xl font-bold text-finance-primary">
-                  SafeExchange Dashboard
+                  Rojas - Casa de cambio
                 </h1>
                 <p className="text-muted-foreground text-lg">Centro de control financiero avanzado</p>
               </div>

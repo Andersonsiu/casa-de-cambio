@@ -142,7 +142,7 @@ const Reports: React.FC = () => {
 
       // Preparar datos para Excel
       const reportData = [
-        ['SafeExchange - Reporte Financiero'],
+        ['Rojas - Casa de cambio - Reporte Financiero'],
         [
           'Periodo:',
           `${format(startDate, 'dd/MM/yyyy')} - ${format(

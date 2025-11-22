@@ -36,7 +36,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             Tu usuario ha sido desactivado.
           </p>
           <p className="text-sm text-muted-foreground">
-            Comunícate con un administrador de SafeExchange para reactivar tu
+            Comunícate con un administrador de Rojas - Casa de cambio para reactivar tu
             acceso.
           </p>
         </div>
