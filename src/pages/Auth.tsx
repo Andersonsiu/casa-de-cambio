@@ -54,11 +54,11 @@ const Auth: React.FC = () => {
     } catch (error: any) {
       console.error(error);
       if (
-        error.code === 'auth/invalid-login-credentials' ||
-        error.code === 'auth/wrong-password'
+        error.code === 'Credenciales inválidas' ||
+        error.code === 'Contraseña incorrecta'
       ) {
         toast.error('Credenciales inválidas');
-      } else if (error.code === 'auth/user-not-found') {
+      } else if (error.code === 'Usuario no encontrado') {
         toast.error('No existe un usuario con ese correo');
       } else {
         toast.error(error.message || 'Error al iniciar sesión');
