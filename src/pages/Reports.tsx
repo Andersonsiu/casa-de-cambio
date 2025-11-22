@@ -23,13 +23,16 @@ import { format, subDays } from 'date-fns';
 import {
   Calendar as CalendarIcon,
   Download,
-  BarChart,
-  PieChart,
-  LineChart,
+  DollarSign,
+  Euro,
+  TrendingUp,
+  Users,
+  Search,
+  Filter,
 } from 'lucide-react';
 import {
-  AreaChart,
-  Area,
+  BarChart as ReBarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -42,44 +45,167 @@ import {
 } from 'recharts';
 import { toast } from 'sonner';
 
-// 🔥 Firebase
+// Firebase
 import { db } from '@/integrations/firebase/client';
 import {
   collection,
   getDocs,
-  query,
-  where,
-  orderBy,
 } from 'firebase/firestore';
 
-// Datos simulados para gráficos
-const transactionData = [
-  { name: 'Lun', compras: 4000, ventas: 2400 },
-  { name: 'Mar', compras: 3000, ventas: 1398 },
-  { name: 'Mie', compras: 2000, ventas: 9800 },
-  { name: 'Jue', compras: 2780, ventas: 3908 },
-  { name: 'Vie', compras: 1890, ventas: 4800 },
-  { name: 'Sab', compras: 2390, ventas: 3800 },
-  { name: 'Dom', compras: 3490, ventas: 4300 },
-];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
-const currencyData = [
-  { name: 'USD', value: 70 },
-  { name: 'EUR', value: 30 },
-];
+interface Transaction {
+  id: string;
+  dni: string;
+  full_name: string;
+  type: 'compra' | 'venta';
+  currency: 'USD' | 'EUR';
+  amount: number;
+  rate: number;
+  total: number;
+  transaction_date: string;
+  created_at: string;
+}
 
-const COLORS = ['#0088FE', '#00C49F'];
+interface ReportMetrics {
+  totalTransactions: number;
+  totalVolume: number;
+  totalProfit: number;
+  averageMargin: number;
+  usdVolume: number;
+  eurVolume: number;
+  comprasCount: number;
+  ventasCount: number;
+  dailyData: { date: string; compras: number; ventas: number }[];
+  currencyDistribution: { name: string; value: number }[];
+}
 
 const Reports: React.FC = () => {
-  const [reportType, setReportType] = useState('ganancias');
-  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 7));
+  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 30));
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
-  const [initialBalance, setInitialBalance] = useState('1000');
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filtros
+  const [searchNombre, setSearchNombre] = useState('');
+  const [searchDNI, setSearchDNI] = useState('');
+  const [filterType, setFilterType] = useState<string>('todos');
+  const [filterCurrency, setFilterCurrency] = useState<string>('todos');
+  
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState<ReportMetrics>({
+    totalTransactions: 0,
+    totalVolume: 0,
+    totalProfit: 0,
+    averageMargin: 0,
+    usdVolume: 0,
+    eurVolume: 0,
+    comprasCount: 0,
+    ventasCount: 0,
+    dailyData: [],
+    currencyDistribution: []
+  });
+
+  // Calcular métricas basadas en las transacciones
+  const calculateMetrics = (transactions: Transaction[]): ReportMetrics => {
+    if (transactions.length === 0) {
+      return {
+        totalTransactions: 0,
+        totalVolume: 0,
+        totalProfit: 0,
+        averageMargin: 0,
+        usdVolume: 0,
+        eurVolume: 0,
+        comprasCount: 0,
+        ventasCount: 0,
+        dailyData: [],
+        currencyDistribution: []
+      };
+    }
+
+    // Agrupar por día
+    const dailyDataMap = new Map<string, { compras: number; ventas: number }>();
+    
+    // Métricas básicas
+    let totalVolume = 0;
+    let usdVolume = 0;
+    let eurVolume = 0;
+    let comprasCount = 0;
+    let ventasCount = 0;
+    
+    // Para cálculo de ganancias (simplificado)
+    const buyRates = { USD: 3.75, EUR: 4.10 };
+    const sellRates = { USD: 3.78, EUR: 4.15 };
+    let totalProfit = 0;
+
+    transactions.forEach(transaction => {
+      const date = transaction.transaction_date;
+      const amount = Number(transaction.amount) || 0;
+      const total = Number(transaction.total) || 0;
+      
+      // Inicializar día si no existe
+      if (!dailyDataMap.has(date)) {
+        dailyDataMap.set(date, { compras: 0, ventas: 0 });
+      }
+      
+      const dayData = dailyDataMap.get(date)!;
+      
+      if (transaction.type === 'compra') {
+        dayData.compras += total;
+        comprasCount++;
+      } else if (transaction.type === 'venta') {
+        dayData.ventas += total;
+        ventasCount++;
+        
+        // Calcular ganancia estimada para ventas
+        const currency = transaction.currency;
+        const estimatedCost = amount * buyRates[currency];
+        const revenue = total;
+        const profit = revenue - estimatedCost;
+        totalProfit += profit;
+      }
+      
+      totalVolume += total;
+      
+      if (transaction.currency === 'USD') {
+        usdVolume += total;
+      } else if (transaction.currency === 'EUR') {
+        eurVolume += total;
+      }
+    });
+
+    // Convertir dailyDataMap a array para el gráfico
+    const dailyData = Array.from(dailyDataMap.entries())
+      .map(([date, data]) => ({
+        date: format(new Date(date), 'dd/MM'),
+        compras: data.compras,
+        ventas: data.ventas
+      }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Distribución por moneda
+    const currencyDistribution = [
+      { name: 'USD', value: usdVolume },
+      { name: 'EUR', value: eurVolume }
+    ].filter(item => item.value > 0);
+
+    const averageMargin = totalVolume > 0 ? (totalProfit / totalVolume) * 100 : 0;
+
+    return {
+      totalTransactions: transactions.length,
+      totalVolume,
+      totalProfit,
+      averageMargin,
+      usdVolume,
+      eurVolume,
+      comprasCount,
+      ventasCount,
+      dailyData,
+      currencyDistribution
+    };
+  };
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -87,22 +213,24 @@ const Reports: React.FC = () => {
       const startStr = format(startDate, 'yyyy-MM-dd');
       const endStr = format(endDate, 'yyyy-MM-dd');
 
-      const txRef = collection(db, 'transactions');
-      const q = query(
-        txRef,
-        where('transaction_date', '>=', startStr),
-        where('transaction_date', '<=', endStr),
-        orderBy('transaction_date', 'desc')
-      );
+      const transactionsRef = collection(db, 'transactions');
+      const querySnapshot = await getDocs(transactionsRef);
+      const allTransactions = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Transaction[];
 
-      const snap = await getDocs(q);
+      // Filtrar por fecha en el cliente
+      const filteredByDate = allTransactions.filter(transaction => {
+        const transactionDate = transaction.transaction_date;
+        return transactionDate >= startStr && transactionDate <= endStr;
+      });
 
-      const docs = snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }));
+      setTransactions(filteredByDate);
+      
+      // Aplicar filtros adicionales
+      applyFilters(filteredByDate);
 
-      setTransactions(docs);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Error al cargar transacciones');
@@ -111,50 +239,71 @@ const Reports: React.FC = () => {
     }
   };
 
+  const applyFilters = (transactionsToFilter: Transaction[]) => {
+    let filtered = transactionsToFilter;
+
+    // Filtrar por nombre
+    if (searchNombre) {
+      filtered = filtered.filter(t => 
+        (t.full_name ?? '').toLowerCase().includes(searchNombre.toLowerCase())
+      );
+    }
+
+    // Filtrar por DNI
+    if (searchDNI) {
+      filtered = filtered.filter(t => 
+        (t.dni ?? '').includes(searchDNI)
+      );
+    }
+
+    // Filtrar por tipo
+    if (filterType !== 'todos') {
+      filtered = filtered.filter(t => t.type === filterType);
+    }
+
+    // Filtrar por moneda
+    if (filterCurrency !== 'todos') {
+      filtered = filtered.filter(t => t.currency === filterCurrency);
+    }
+
+    setFilteredTransactions(filtered);
+    
+    // Calcular métricas para transacciones filtradas
+    const calculatedMetrics = calculateMetrics(filtered);
+    setMetrics(calculatedMetrics);
+  };
+
   useEffect(() => {
     fetchTransactions();
   }, []);
 
+  // Aplicar filtros cuando cambien los valores
+  useEffect(() => {
+    applyFilters(transactions);
+  }, [searchNombre, searchDNI, filterType, filterCurrency, transactions]);
+
   const generateReport = () => {
     fetchTransactions();
-    toast.success('Reporte generado exitosamente');
+    toast.success('Reporte actualizado');
   };
 
   const downloadReport = async () => {
     try {
       const XLSX = await import('xlsx');
 
-      const filteredTransactions = searchTerm
-        ? transactions.filter((t) =>
-            (t.dni ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.full_name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.type ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (t.currency ?? '').toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        : transactions;
-
-      // Calcular totales
-      const totalTransactions = filteredTransactions.length;
-      const totalAmount = filteredTransactions.reduce(
-        (sum, t) => sum + Number(t.total || 0),
-        0
-      );
-
       // Preparar datos para Excel
       const reportData = [
-        ['Rojas - Casa de cambio - Reporte Financiero'],
+        ['ROJAS - Casa de Cambio - Histórico de Transacciones'],
         [
           'Periodo:',
-          `${format(startDate, 'dd/MM/yyyy')} - ${format(
-            endDate,
-            'dd/MM/yyyy'
-          )}`,
+          `${format(startDate, 'dd/MM/yyyy')} - ${format(endDate, 'dd/MM/yyyy')}`
         ],
-        ['Tipo de Reporte:', reportType],
-        ['Saldo Inicial:', `S/ ${initialBalance}`],
+        ['Fecha de generación:', format(new Date(), 'dd/MM/yyyy HH:mm')],
+        ['Total de transacciones:', filteredTransactions.length],
         [],
-        ['Transacciones'],
+        ['DETALLE DE TRANSACCIONES'],
         [
+          'Fecha',
           'DNI',
           'Nombre',
           'Tipo',
@@ -162,9 +311,9 @@ const Reports: React.FC = () => {
           'Cantidad',
           'Tasa',
           'Total (S/)',
-          'Fecha',
         ],
         ...filteredTransactions.map((t) => [
+          t.transaction_date ? format(new Date(t.transaction_date), 'dd/MM/yyyy') : '',
           t.dni ?? '',
           t.full_name ?? '',
           (t.type ?? '').toString().toUpperCase(),
@@ -172,302 +321,331 @@ const Reports: React.FC = () => {
           t.amount ?? 0,
           t.rate ?? 0,
           t.total ?? 0,
-          t.transaction_date
-            ? format(new Date(t.transaction_date), 'dd/MM/yyyy')
-            : '',
         ]),
-        [],
-        ['Métricas Clave'],
-        ['Métrica', 'Valor'],
-        ['Total Transacciones', totalTransactions],
-        ['Volumen Total', `S/ ${totalAmount.toFixed(2)}`],
       ];
 
       const ws = XLSX.utils.aoa_to_sheet(reportData);
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+      XLSX.utils.book_append_sheet(wb, ws, 'Transacciones');
 
-      const fileName = `Reporte_${format(startDate, 'ddMMyyyy')}_${format(
-        endDate,
-        'ddMMyyyy'
-      )}.xlsx`;
+      const fileName = `Historico_Transacciones_${format(new Date(), 'ddMMyyyy_HHmm')}.xlsx`;
       XLSX.writeFile(wb, fileName);
 
-      toast.success('Reporte exportado exitosamente');
+      toast.success('Histórico exportado exitosamente');
     } catch (error) {
       console.error('Error al exportar:', error);
-      toast.error('Error al exportar el reporte');
+      toast.error('Error al exportar el histórico');
     }
+  };
+
+  const clearFilters = () => {
+    setSearchNombre('');
+    setSearchDNI('');
+    setFilterType('todos');
+    setFilterCurrency('todos');
   };
 
   return (
     <MainLayout>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Reportes Financieros</h1>
-        <div className="text-sm text-gray-500">
-          {new Date().toLocaleDateString('es-PE', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
+        <h1 className="text-2xl font-bold">Reportes y Análisis</h1>
+        <div className="text-sm text-muted-foreground">
+          {format(new Date(), 'EEEE, d MMMM yyyy')}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Filtro</CardTitle>
-            <CardDescription>
-              Seleccione el rango de fechas y busque
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Buscar</label>
-                <Input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="DNI, nombre, tipo..."
-                  className="border-input focus:border-accent transition-colors"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  Tipo de Reporte
-                </label>
-                <Select value={reportType} onValueChange={setReportType}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione tipo de reporte" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ganancias">Ganancias</SelectItem>
-                    <SelectItem value="margenes">Márgenes</SelectItem>
-                    <SelectItem value="volumen">
-                      Volumen de Transacciones
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+      {/* Filtros Horizontales */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Filter className="h-5 w-5" />
+            Filtros de Búsqueda
+          </CardTitle>
+          <CardDescription>
+            Filtre las transacciones según sus criterios
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            {/* Nombre */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Nombre</label>
+              <Input
+                type="text"
+                value={searchNombre}
+                onChange={(e) => setSearchNombre(e.target.value)}
+                placeholder="Buscar por nombre"
+                className="w-full"
+              />
+            </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Fecha Inicial</label>
-                <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(startDate, 'PPP')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={(date) => {
-                        if (date) setStartDate(date);
-                        setStartDateOpen(false);
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+            {/* DNI */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">DNI</label>
+              <Input
+                type="text"
+                value={searchDNI}
+                onChange={(e) => setSearchDNI(e.target.value)}
+                placeholder="Buscar por DNI"
+                className="w-full"
+              />
+            </div>
+
+            {/* Tipo */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Tipo</label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="compra">Compra</SelectItem>
+                  <SelectItem value="venta">Venta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Moneda */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Moneda</label>
+              <Select value={filterCurrency} onValueChange={setFilterCurrency}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todas</SelectItem>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="EUR">EUR</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Fechas */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Fecha Inicial</label>
+              <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(startDate, 'dd/MM/yy')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(date) => {
+                      if (date) setStartDate(date);
+                      setStartDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Fecha Final</label>
+              <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(endDate, 'dd/MM/yy')}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={endDate}
+                    onSelect={(date) => {
+                      if (date) setEndDate(date);
+                      setEndDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          {/* Botones de Acción */}
+          <div className="flex gap-3 mt-6">
+            <Button 
+              onClick={generateReport} 
+              disabled={loading}
+              className="flex-1"
+            >
+              <Search className="mr-2 h-4 w-4" />
+              {loading ? 'Buscando...' : 'Buscar Transacciones'}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={downloadReport}
+              disabled={filteredTransactions.length === 0}
+              className="flex-1"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Exportar Histórico
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={clearFilters}
+              className="w-32"
+            >
+              Limpiar
+            </Button>
+          </div>
+
+          <div className="text-sm text-muted-foreground text-center mt-4">
+            {filteredTransactions.length} transacciones encontradas
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Métricas Rápidas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Users className="h-8 w-8 text-blue-600" />
+              <div>
+                <div className="text-2xl font-bold">{metrics.totalTransactions}</div>
+                <div className="text-sm text-muted-foreground">Total Transacciones</div>
               </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Fecha Final</label>
-                <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left font-normal"
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {format(endDate, 'PPP')}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={endDate}
-                      onSelect={(date) => {
-                        if (date) setEndDate(date);
-                        setEndDateOpen(false);
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">
-                  Saldo Inicial (S/)
-                </label>
-                <Input
-                  type="number"
-                  value={initialBalance}
-                  onChange={(e) => setInitialBalance(e.target.value)}
-                  placeholder="Ingrese el saldo inicial"
-                />
-              </div>
-
-              <Button onClick={generateReport} className="w-full" disabled={loading}>
-                {loading ? 'Cargando...' : 'Generar Reporte'}
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={downloadReport}
-                className="w-full flex items-center justify-center"
-              >
-                <Download className="mr-2 h-4 w-4" />
-                Exportar a Excel
-              </Button>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Resumen del Periodo</CardTitle>
-              <CardDescription>
-                {format(startDate, 'dd/MM/yyyy')} -{' '}
-                {format(endDate, 'dd/MM/yyyy')}
-              </CardDescription>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <DollarSign className="h-8 w-8 text-green-600" />
+              <div>
+                <div className="text-2xl font-bold">S/ {metrics.totalVolume.toFixed(2)}</div>
+                <div className="text-sm text-muted-foreground">Volumen Total</div>
+              </div>
             </div>
-            <div className="flex space-x-2">
-              <Button variant="ghost" size="icon">
-                <BarChart className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <LineChart className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon">
-                <PieChart className="h-4 w-4" />
-              </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <TrendingUp className="h-8 w-8 text-purple-600" />
+              <div>
+                <div className="text-2xl font-bold">S/ {metrics.totalProfit.toFixed(2)}</div>
+                <div className="text-sm text-muted-foreground">Ganancia Estimada</div>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div style={{ width: '100%', height: 300 }}>
-              <ResponsiveContainer>
-                <AreaChart
-                  data={transactionData}
-                  margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Area
-                    type="monotone"
-                    dataKey="compras"
-                    stackId="1"
-                    stroke="#8884d8"
-                    fill="#8884d8"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="ventas"
-                    stackId="1"
-                    stroke="#82ca9d"
-                    fill="#82ca9d"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-3">
+              <Euro className="h-8 w-8 text-orange-600" />
+              <div>
+                <div className="text-2xl font-bold">{metrics.averageMargin.toFixed(1)}%</div>
+                <div className="text-sm text-muted-foreground">Margen Promedio</div>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
-        <Card className="lg:col-span-1">
+      {/* Gráficos */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
           <CardHeader>
-            <CardTitle>Distribución por Moneda</CardTitle>
+            <CardTitle>Compras vs Ventas por Día</CardTitle>
+            <CardDescription>Evolución diaria del volumen</CardDescription>
           </CardHeader>
           <CardContent>
-            <div style={{ width: '100%', height: 250 }}>
-              <ResponsiveContainer>
-                <RePieChart>
-                  <Pie
-                    data={currencyData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
+            {metrics.dailyData.length > 0 ? (
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <ReBarChart
+                    data={metrics.dailyData}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                   >
-                    {currencyData.map((entry, index) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={COLORS[index % COLORS.length]}
-                      />
-                    ))}
-                  </Pie>
-                  <Legend />
-                </RePieChart>
-              </ResponsiveContainer>
-            </div>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value) => [`S/ ${Number(value).toFixed(2)}`, 'Monto']}
+                    />
+                    <Legend />
+                    <Bar 
+                      dataKey="compras" 
+                      name="Compras" 
+                      fill="#8884d8" 
+                      radius={[2, 2, 0, 0]}
+                    />
+                    <Bar 
+                      dataKey="ventas" 
+                      name="Ventas" 
+                      fill="#82ca9d" 
+                      radius={[2, 2, 0, 0]}
+                    />
+                  </ReBarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                No hay datos para el período seleccionado
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Métricas Clave</CardTitle>
+            <CardTitle>Distribución por Moneda</CardTitle>
+            <CardDescription>Volumen por tipo de moneda</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* De momento estas métricas son estáticas.
-                Luego se pueden calcular con los datos de `transactions`. */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-sm text-blue-600 font-medium">
-                  Total Transacciones
-                </div>
-                <div className="text-2xl font-bold mt-1">124</div>
-                <div className="text-xs text-blue-500 mt-1">
-                  +15% vs. periodo anterior
-                </div>
+            {metrics.currencyDistribution.length > 0 ? (
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <RePieChart>
+                    <Pie
+                      data={metrics.currencyDistribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
+                    >
+                      {metrics.currencyDistribution.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`S/ ${Number(value).toFixed(2)}`, 'Volumen']} />
+                    <Legend />
+                  </RePieChart>
+                </ResponsiveContainer>
               </div>
-
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-sm text-green-600 font-medium">
-                  Ganancia Total
-                </div>
-                <div className="text-2xl font-bold mt-1">S/ 5,280.45</div>
-                <div className="text-xs text-green-500 mt-1">
-                  +8% vs. periodo anterior
-                </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                No hay datos de monedas
               </div>
-
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <div className="text-sm text-purple-600 font-medium">
-                  Margen Promedio
-                </div>
-                <div className="text-2xl font-bold mt-1">4.2%</div>
-                <div className="text-xs text-purple-500 mt-1">
-                  +0.3% vs. periodo anterior
-                </div>
-              </div>
-
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <div className="text-sm text-orange-600 font-medium">
-                  Volumen Negociado
-                </div>
-                <div className="text-2xl font-bold mt-1">$ 125,430</div>
-                <div className="text-xs text-orange-500 mt-1">
-                  +12% vs. periodo anterior
-                </div>
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
