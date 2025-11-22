@@ -37,11 +37,10 @@ import {
   updateUserProfile,
   deleteUserProfile,
 } from '@/services/firestore';
-import { auth } from '@/integrations/firebase/client';
-import {
-  createUserWithEmailAndPassword,
-  deleteUser,
-} from 'firebase/auth';
+
+// ✅ YA NO IMPORTAMOS `auth` NI `createUserWithEmailAndPassword`
+// import { auth } from '@/integrations/firebase/client';
+// import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<AppUser[]>([]);
@@ -75,6 +74,39 @@ const UserManagement: React.FC = () => {
     load();
   }, []);
 
+  // 🔥 Helper para crear usuario en Firebase Auth SIN tocar la sesión actual
+  const signUpUserInFirebaseAuth = async (
+    email: string,
+    password: string
+  ): Promise<string> => {
+    const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+    if (!apiKey) {
+      throw new Error('Falta VITE_FIREBASE_API_KEY en el .env');
+    }
+
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`;
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: false, // no necesitamos idToken, solo crear la cuenta
+      }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      console.error('Firebase signUp error:', errorData);
+      throw new Error(errorData.error?.message || 'Error al crear usuario en Auth');
+    }
+
+    const data = await res.json();
+    // `localId` es el uid del usuario nuevo
+    return data.localId as string;
+  };
+
   const addUser = async () => {
     if (!newUser.name || !newUser.email || !newUser.password) {
       toast.error('Todos los campos son obligatorios');
@@ -87,15 +119,13 @@ const UserManagement: React.FC = () => {
     }
 
     try {
-      // 1. Crear usuario en Firebase Auth
-      const cred = await createUserWithEmailAndPassword(
-        auth,
+      // 1️⃣ Crear usuario en Firebase Auth vía REST (NO toca tu sesión actual)
+      const uid = await signUpUserInFirebaseAuth(
         newUser.email,
         newUser.password
       );
-      const uid = cred.user.uid;
 
-      // 2. Crear perfil en Firestore
+      // 2️⃣ Crear perfil en Firestore
       await createUserProfile(uid, {
         name: newUser.name,
         email: newUser.email,
@@ -121,7 +151,7 @@ const UserManagement: React.FC = () => {
         password: '',
       });
 
-      toast.success('Usuario creado en Firebase y Firestore');
+      toast.success('Usuario creado en Auth y Firestore sin cerrar tu sesión');
     } catch (error: any) {
       console.error(error);
       toast.error(error?.message || 'Error al crear usuario');
@@ -148,9 +178,8 @@ const UserManagement: React.FC = () => {
 
   const removeUser = async (id: string) => {
     try {
-      // Nota: para borrar también de Firebase Auth necesitarías
-      // hacerlo desde un Cloud Function con Admin SDK.
-      // Desde el frontend, solo eliminamos el perfil de Firestore:
+      // Desde el frontend solo eliminamos el perfil de Firestore.
+      // Para borrar también de Auth se necesita Admin SDK / Cloud Function.
       await deleteUserProfile(id);
       setUsers((prev) => prev.filter((u) => u.id !== id));
       toast.success('Usuario eliminado (perfil)');
