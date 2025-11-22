@@ -1,4 +1,3 @@
-
 import React from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import TransactionForm from '@/components/transactions/TransactionForm';
@@ -17,11 +16,11 @@ const Transactions: React.FC = () => {
         </div>
 
         <Tabs defaultValue="register" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          {/* Centrar TabsList */}
+          <TabsList className="grid w-full grid-cols-3 mx-auto justify-center">
             <TabsTrigger value="register">Registrar</TabsTrigger>
             <TabsTrigger value="recent">Recientes</TabsTrigger>
             <TabsTrigger value="calculator">Calculadora</TabsTrigger>
-            <TabsTrigger value="profitability">Rentabilidad</TabsTrigger>
           </TabsList>
 
           <TabsContent value="register" className="mt-6">

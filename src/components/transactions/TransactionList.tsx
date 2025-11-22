@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Pencil, Trash2, Search } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 
 import { useUserRole } from '@/hooks/useUserRole';
@@ -45,8 +45,8 @@ interface Transaction {
   amount: number;
   rate: number;
   total: number;
-  transaction_date: string; // ISO o string fecha
-  created_at: string;       // ISO o timestamp
+  transaction_date: string; // Formato: "2025-11-20"
+  created_at: string;       // ISO string
 }
 
 const TransactionList: React.FC = () => {
@@ -60,7 +60,6 @@ const TransactionList: React.FC = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      // Colección "transactions" en Firestore
       const ref = collection(db, 'transactions');
       const q = query(ref, orderBy('created_at', 'desc'));
       const snap = await getDocs(q);
@@ -126,6 +125,16 @@ const TransactionList: React.FC = () => {
       console.error('Error deleting transaction:', error);
       toast.error('Error al eliminar transacción');
     }
+  };
+
+  // Función para convertir transaction_date string a Date
+  const parseTransactionDate = (dateString: string): Date => {
+    // Si la fecha está en formato "2025-11-20", la convertimos a Date
+    if (dateString && dateString.includes('-')) {
+      return parseISO(dateString);
+    }
+    // Si es una fecha ISO, usar parseISO directamente
+    return new Date(dateString);
   };
 
   return (
@@ -196,7 +205,12 @@ const TransactionList: React.FC = () => {
                         {transaction.total.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        {transaction.transaction_date ? format(new Date(transaction.transaction_date), 'dd/MM/yyyy') : '-'}
+                        {transaction.transaction_date
+                          ? format(
+                              parseTransactionDate(transaction.transaction_date),
+                              'dd/MM/yyyy'
+                            )
+                          : '-'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -247,7 +261,7 @@ const TransactionList: React.FC = () => {
                 currency: editingTransaction.currency,
                 amount: editingTransaction.amount,
                 rate: editingTransaction.rate,
-                date: new Date(editingTransaction.transaction_date),
+                date: parseTransactionDate(editingTransaction.transaction_date),
                 dni: editingTransaction.dni,
                 full_name: editingTransaction.full_name,
               }}
