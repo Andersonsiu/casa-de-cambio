@@ -11,8 +11,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import QRCode from 'react-qr-code';
 
 import { auth } from '@/integrations/firebase/client';
 import {
@@ -20,8 +28,8 @@ import {
   reauthenticateWithCredential,
   updatePassword,
   multiFactor,
-  // 👇 revisa estos imports según tu versión de Firebase
-  // TotpMultiFactorGenerator,
+  TotpMultiFactorGenerator,
+  TotpSecret,
 } from 'firebase/auth';
 
 import { useUserRole } from '@/hooks/useUserRole';
@@ -42,16 +50,25 @@ const passwordRules = {
 
 const SecuritySettings: React.FC = () => {
   const { firebaseUser, role } = useUserRole();
+
+  // Campos de contraseña
   const [pwd, setPwd] = useState<PasswordState>({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
+
+  // Mostrar / ocultar cada campo
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const [changing, setChanging] = useState(false);
 
   // 2FA
   const [mfaLoading, setMfaLoading] = useState(false);
   const [mfaSecretUri, setMfaSecretUri] = useState<string | null>(null);
+  const [totpSecret, setTotpSecret] = useState<TotpSecret | null>(null);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaEnrolled, setMfaEnrolled] = useState<boolean>(() => {
     const user = auth.currentUser;
@@ -63,6 +80,7 @@ const SecuritySettings: React.FC = () => {
     }
   });
 
+  // Chequeos de contraseña
   const passwordChecks = useMemo(() => {
     const v = pwd.newPassword;
     return {
@@ -84,6 +102,9 @@ const SecuritySettings: React.FC = () => {
     [passwordChecks]
   );
 
+  /***********************
+   * CAMBIAR CONTRASEÑA
+   ***********************/
   const handleChangePassword = async () => {
     if (!firebaseUser) {
       toast.error('No hay usuario autenticado');
@@ -112,7 +133,7 @@ const SecuritySettings: React.FC = () => {
 
     setChanging(true);
     try {
-      // 1. Reautenticar
+      // 1. Reautenticación
       const credential = EmailAuthProvider.credential(
         firebaseUser.email,
         pwd.currentPassword
@@ -141,7 +162,7 @@ const SecuritySettings: React.FC = () => {
   };
 
   /***********************
-   * 2FA TOTP – ESQUELETO
+   * 2FA TOTP REAL
    ***********************/
   const startEnroll2FA = async () => {
     const user = auth.currentUser;
@@ -150,38 +171,39 @@ const SecuritySettings: React.FC = () => {
       return;
     }
 
-    setMfaLoading(true);
     try {
+      // La mayoría de guías recomienda reautenticar antes de enrolar MFA.
+      if (!firebaseUser?.email) {
+        toast.error('El usuario actual no tiene email definido');
+        return;
+      }
+
+      setMfaLoading(true);
+
       // 1. Obtener sesión MFA
       const mfaUser = multiFactor(user);
       const mfaSession = await mfaUser.getSession();
 
       // 2. Generar secreto TOTP
-      // NOTA IMPORTANTE:
-      // La API exacta puede variar según la versión de Firebase.
-      // Revisa la doc oficial y ajusta esto:
-      //
-      // const totpSecret = await TotpMultiFactorGenerator.generateSecret(mfaSession);
-      // const uri = totpSecret.generateQrCodeUrl({
-      //   accountName: user.email ?? 'usuario',
-      //   issuer: 'Rojas Casa de Cambio',
-      // });
-      //
-      // setMfaSecretUri(uri);
-      //
-      // Aquí asumimos que ya tienes `uri` con formato otpauth://...
-      //
-      // Por ahora dejo un placeholder para que puedas conectar la lógica real:
-      const fakeUri =
-        'otpauth://totp/Rojas-Casa-de-cambio:demo?secret=DEMOSECRET&issuer=Rojas-Casa-de-cambio';
-      setMfaSecretUri(fakeUri);
+      const secret = await TotpMultiFactorGenerator.generateSecret(mfaSession);
+
+      // 3. URL para QR (otpauth:// ...)
+      const url = secret.generateQrCodeUrl(
+        user.email ?? 'usuario',
+        'Rojas Casa de cambio'
+      );
+
+      setTotpSecret(secret);
+      setMfaSecretUri(url);
 
       toast.info(
         'Escanea el código QR con tu app de autenticación y luego ingresa el código de 6 dígitos.'
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error('Error al iniciar el enrolamiento de 2FA');
+      toast.error(
+        'Error al iniciar el enrolamiento de 2FA. Verifica que TOTP MFA esté habilitado en tu proyecto.'
+      );
     } finally {
       setMfaLoading(false);
     }
@@ -191,6 +213,11 @@ const SecuritySettings: React.FC = () => {
     const user = auth.currentUser;
     if (!user) return;
 
+    if (!totpSecret || !mfaSecretUri) {
+      toast.error('No hay secreto TOTP generado. Vuelve a iniciar el proceso.');
+      return;
+    }
+
     if (!mfaCode) {
       toast.error('Ingresa el código generado por tu app de autenticación');
       return;
@@ -198,21 +225,24 @@ const SecuritySettings: React.FC = () => {
 
     setMfaLoading(true);
     try {
-      // Ejemplo de finalización (ajusta según la API real):
-      //
-      // const mfaUser = multiFactor(user);
-      // const assertion = TotpMultiFactorGenerator.assertionForEnrollment(
-      //   totpSecret,
-      //   mfaCode
-      // );
-      // await mfaUser.enroll(assertion, 'TOTP principal');
-      //
+      const mfaUser = multiFactor(user);
+
+      // Crear la assertion usando el código de 6 dígitos
+      const assertion = TotpMultiFactorGenerator.assertionForEnrollment(
+        totpSecret,
+        mfaCode
+      );
+
+      // Enrolar el factor TOTP
+      await mfaUser.enroll(assertion, 'App de autenticación');
+
       setMfaEnrolled(true);
       setMfaSecretUri(null);
+      setTotpSecret(null);
       setMfaCode('');
 
       toast.success('Autenticación en dos pasos activada');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       toast.error('No se pudo verificar el código, intenta nuevamente');
     } finally {
@@ -226,20 +256,25 @@ const SecuritySettings: React.FC = () => {
 
     setMfaLoading(true);
     try {
-      // Desenrolar 2FA. Ejemplo aproximado:
-      //
-      // const mfaUser = multiFactor(user);
-      // const [factor] = mfaUser.enrolledFactors;
-      // if (factor) {
-      //   await mfaUser.unenroll(factor);
-      // }
-      //
+      const mfaUser = multiFactor(user);
+
+      if (!mfaUser.enrolledFactors.length) {
+        toast.error('No tienes factores TOTP registrados');
+        setMfaEnrolled(false);
+        return;
+      }
+
+      // Aquí, por simplicidad, eliminamos el primer factor enrolado
+      const factor = mfaUser.enrolledFactors[0];
+      await mfaUser.unenroll(factor);
+
       setMfaEnrolled(false);
       setMfaSecretUri(null);
+      setTotpSecret(null);
       setMfaCode('');
 
       toast.success('Autenticación en dos pasos desactivada');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       toast.error('No se pudo desactivar la 2FA');
     } finally {
@@ -259,49 +294,97 @@ const SecuritySettings: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Contraseña actual */}
           <div className="space-y-2">
             <Label htmlFor="currentPassword">Contraseña actual</Label>
-            <Input
-              id="currentPassword"
-              type="password"
-              autoComplete="current-password"
-              value={pwd.currentPassword}
-              onChange={(e) =>
-                setPwd((prev) => ({ ...prev, currentPassword: e.target.value }))
-              }
-              placeholder="Ingresa tu contraseña actual"
-            />
+            <div className="relative">
+              <Input
+                id="currentPassword"
+                type={showCurrent ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={pwd.currentPassword}
+                onChange={(e) =>
+                  setPwd((prev) => ({
+                    ...prev,
+                    currentPassword: e.target.value,
+                  }))
+                }
+                placeholder="Ingresa tu contraseña actual"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-3 flex items-center text-muted-foreground"
+                onClick={() => setShowCurrent((v) => !v)}
+              >
+                {showCurrent ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
+          {/* Nueva contraseña */}
           <div className="space-y-2">
             <Label htmlFor="newPassword">Nueva contraseña</Label>
-            <Input
-              id="newPassword"
-              type="password"
-              autoComplete="new-password"
-              value={pwd.newPassword}
-              onChange={(e) =>
-                setPwd((prev) => ({ ...prev, newPassword: e.target.value }))
-              }
-              placeholder="Nueva contraseña segura"
-            />
+            <div className="relative">
+              <Input
+                id="newPassword"
+                type={showNew ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={pwd.newPassword}
+                onChange={(e) =>
+                  setPwd((prev) => ({ ...prev, newPassword: e.target.value }))
+                }
+                placeholder="Nueva contraseña segura"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-3 flex items-center text-muted-foreground"
+                onClick={() => setShowNew((v) => !v)}
+              >
+                {showNew ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
+          {/* Confirmar nueva contraseña */}
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirmar nueva contraseña</Label>
-            <Input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={pwd.confirmPassword}
-              onChange={(e) =>
-                setPwd((prev) => ({
-                  ...prev,
-                  confirmPassword: e.target.value,
-                }))
-              }
-              placeholder="Repite la nueva contraseña"
-            />
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirm ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={pwd.confirmPassword}
+                onChange={(e) =>
+                  setPwd((prev) => ({
+                    ...prev,
+                    confirmPassword: e.target.value,
+                  }))
+                }
+                placeholder="Repite la nueva contraseña"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-3 flex items-center text-muted-foreground"
+                onClick={() => setShowConfirm((v) => !v)}
+              >
+                {showConfirm ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Lista de requisitos visual */}
@@ -388,7 +471,11 @@ const SecuritySettings: React.FC = () => {
               <p className="mb-2 text-sm font-medium">
                 1. Escanea este código en tu app de autenticación
               </p>
-              {/* Aquí podrías renderizar un QR con react-qr-code usando mfaSecretUri */}
+
+              <div className="flex justify-center py-4">
+                <QRCode value={mfaSecretUri} size={160} />
+              </div>
+
               <pre className="mb-2 overflow-x-auto rounded bg-slate-900 p-3 text-xs text-slate-50">
                 {mfaSecretUri}
               </pre>
@@ -398,7 +485,9 @@ const SecuritySettings: React.FC = () => {
               </p>
 
               <div className="mt-4 space-y-2">
-                <Label htmlFor="mfaCode">2. Ingresa el código de 6 dígitos</Label>
+                <Label htmlFor="mfaCode">
+                  2. Ingresa el código de 6 dígitos
+                </Label>
                 <Input
                   id="mfaCode"
                   value={mfaCode}
