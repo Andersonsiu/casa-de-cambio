@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { format, subDays } from 'date-fns';
+import { format, subDays, parseISO, isWithinInterval } from 'date-fns';
 import {
   Calendar as CalendarIcon,
   Download,
@@ -29,6 +29,9 @@ import {
   Users,
   Search,
   Filter,
+  UserCheck,
+  Award,
+  BarChart3,
 } from 'lucide-react';
 import {
   BarChart as ReBarChart,
@@ -42,6 +45,8 @@ import {
   Pie,
   Cell,
   Legend,
+  LineChart,
+  Line,
 } from 'recharts';
 import { toast } from 'sonner';
 
@@ -52,7 +57,7 @@ import {
   getDocs,
 } from 'firebase/firestore';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 interface Transaction {
   id: string;
@@ -78,6 +83,8 @@ interface ReportMetrics {
   ventasCount: number;
   dailyData: { date: string; compras: number; ventas: number }[];
   currencyDistribution: { name: string; value: number }[];
+  topClients: { name: string; transactions: number; volume: number }[];
+  weeklyTrend: { week: string; volume: number; transactions: number }[];
 }
 
 const Reports: React.FC = () => {
@@ -91,6 +98,8 @@ const Reports: React.FC = () => {
   const [searchDNI, setSearchDNI] = useState('');
   const [filterType, setFilterType] = useState<string>('todos');
   const [filterCurrency, setFilterCurrency] = useState<string>('todos');
+  const [minAmount, setMinAmount] = useState<string>('');
+  const [maxAmount, setMaxAmount] = useState<string>('');
   
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
@@ -105,8 +114,14 @@ const Reports: React.FC = () => {
     comprasCount: 0,
     ventasCount: 0,
     dailyData: [],
-    currencyDistribution: []
+    currencyDistribution: [],
+    topClients: [],
+    weeklyTrend: []
   });
+
+  // Validar que fecha final no sea menor a fecha inicial
+  const isDateRangeValid = startDate <= endDate;
+  const dateError = !isDateRangeValid ? "La fecha final no puede ser menor a la fecha inicial" : "";
 
   // Calcular métricas basadas en las transacciones
   const calculateMetrics = (transactions: Transaction[]): ReportMetrics => {
@@ -121,12 +136,20 @@ const Reports: React.FC = () => {
         comprasCount: 0,
         ventasCount: 0,
         dailyData: [],
-        currencyDistribution: []
+        currencyDistribution: [],
+        topClients: [],
+        weeklyTrend: []
       };
     }
 
-    // Agrupar por día
+    // Agrupar por día EXACTO dentro del rango de fechas
     const dailyDataMap = new Map<string, { compras: number; ventas: number }>();
+    
+    // Para clientes frecuentes
+    const clientMap = new Map<string, { transactions: number; volume: number }>();
+    
+    // Para tendencia semanal
+    const weeklyMap = new Map<string, { volume: number; transactions: number }>();
     
     // Métricas básicas
     let totalVolume = 0;
@@ -135,7 +158,7 @@ const Reports: React.FC = () => {
     let comprasCount = 0;
     let ventasCount = 0;
     
-    // Para cálculo de ganancias (simplificado)
+    // Para cálculo de ganancias
     const buyRates = { USD: 3.75, EUR: 4.10 };
     const sellRates = { USD: 3.78, EUR: 4.15 };
     let totalProfit = 0;
@@ -144,13 +167,28 @@ const Reports: React.FC = () => {
       const date = transaction.transaction_date;
       const amount = Number(transaction.amount) || 0;
       const total = Number(transaction.total) || 0;
+      const clientName = transaction.full_name || 'Cliente sin nombre';
       
-      // Inicializar día si no existe
+      // Inicializar día si no existe - usar fecha exacta del filtro
       if (!dailyDataMap.has(date)) {
         dailyDataMap.set(date, { compras: 0, ventas: 0 });
       }
       
+      // Inicializar cliente si no existe
+      if (!clientMap.has(clientName)) {
+        clientMap.set(clientName, { transactions: 0, volume: 0 });
+      }
+      
+      // Calcular semana (año-semana)
+      const transactionDate = parseISO(date);
+      const weekKey = `${transactionDate.getFullYear()}-S${Math.ceil((transactionDate.getDate() + transactionDate.getDay()) / 7)}`;
+      if (!weeklyMap.has(weekKey)) {
+        weeklyMap.set(weekKey, { volume: 0, transactions: 0 });
+      }
+      
       const dayData = dailyDataMap.get(date)!;
+      const clientData = clientMap.get(clientName)!;
+      const weekData = weeklyMap.get(weekKey)!;
       
       if (transaction.type === 'compra') {
         dayData.compras += total;
@@ -168,6 +206,10 @@ const Reports: React.FC = () => {
       }
       
       totalVolume += total;
+      clientData.transactions += 1;
+      clientData.volume += total;
+      weekData.transactions += 1;
+      weekData.volume += total;
       
       if (transaction.currency === 'USD') {
         usdVolume += total;
@@ -176,14 +218,38 @@ const Reports: React.FC = () => {
       }
     });
 
-    // Convertir dailyDataMap a array para el gráfico
+    // Convertir dailyDataMap a array para el gráfico - SOLO días dentro del rango
     const dailyData = Array.from(dailyDataMap.entries())
       .map(([date, data]) => ({
-        date: format(new Date(date), 'dd/MM'),
+        date: format(parseISO(date), 'dd/MM'),
         compras: data.compras,
-        ventas: data.ventas
+        ventas: data.ventas,
+        fullDate: date
       }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .filter(item => {
+        const itemDate = parseISO(item.fullDate);
+        return isWithinInterval(itemDate, { start: startDate, end: endDate });
+      })
+      .sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime());
+
+    // Top 5 clientes por volumen
+    const topClients = Array.from(clientMap.entries())
+      .map(([name, data]) => ({
+        name: name.length > 15 ? name.substring(0, 15) + '...' : name,
+        transactions: data.transactions,
+        volume: data.volume
+      }))
+      .sort((a, b) => b.volume - a.volume)
+      .slice(0, 5);
+
+    // Tendencias semanales
+    const weeklyTrend = Array.from(weeklyMap.entries())
+      .map(([week, data]) => ({
+        week: `Sem ${week.split('-')[1]}`,
+        volume: data.volume,
+        transactions: data.transactions
+      }))
+      .sort((a, b) => a.week.localeCompare(b.week));
 
     // Distribución por moneda
     const currencyDistribution = [
@@ -202,12 +268,19 @@ const Reports: React.FC = () => {
       eurVolume,
       comprasCount,
       ventasCount,
-      dailyData,
-      currencyDistribution
+      dailyData: dailyData.map(({ date, compras, ventas }) => ({ date, compras, ventas })),
+      currencyDistribution,
+      topClients,
+      weeklyTrend
     };
   };
 
   const fetchTransactions = async () => {
+    if (!isDateRangeValid) {
+      toast.error("Corrija el rango de fechas antes de buscar");
+      return;
+    }
+
     setLoading(true);
     try {
       const startStr = format(startDate, 'yyyy-MM-dd');
@@ -220,7 +293,7 @@ const Reports: React.FC = () => {
         ...doc.data()
       })) as Transaction[];
 
-      // Filtrar por fecha en el cliente
+      // Filtrar por fecha en el cliente - EXACTO
       const filteredByDate = allTransactions.filter(transaction => {
         const transactionDate = transaction.transaction_date;
         return transactionDate >= startStr && transactionDate <= endStr;
@@ -230,6 +303,8 @@ const Reports: React.FC = () => {
       
       // Aplicar filtros adicionales
       applyFilters(filteredByDate);
+
+      toast.success(`Se encontraron ${filteredByDate.length} transacciones`);
 
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -280,11 +355,10 @@ const Reports: React.FC = () => {
   // Aplicar filtros cuando cambien los valores
   useEffect(() => {
     applyFilters(transactions);
-  }, [searchNombre, searchDNI, filterType, filterCurrency, transactions]);
+  }, [searchNombre, searchDNI, filterType, filterCurrency, minAmount, maxAmount, transactions]);
 
   const generateReport = () => {
     fetchTransactions();
-    toast.success('Reporte actualizado');
   };
 
   const downloadReport = async () => {
@@ -300,6 +374,7 @@ const Reports: React.FC = () => {
         ],
         ['Fecha de generación:', format(new Date(), 'dd/MM/yyyy HH:mm')],
         ['Total de transacciones:', filteredTransactions.length],
+        ['Volumen total:', `S/ ${metrics.totalVolume.toFixed(2)}`],
         [],
         ['DETALLE DE TRANSACCIONES'],
         [
@@ -343,6 +418,8 @@ const Reports: React.FC = () => {
     setSearchDNI('');
     setFilterType('todos');
     setFilterCurrency('todos');
+    setMinAmount('');
+    setMaxAmount('');
   };
 
   return (
@@ -355,131 +432,140 @@ const Reports: React.FC = () => {
       </div>
 
       {/* Filtros Horizontales */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filtros de Búsqueda
-          </CardTitle>
-          <CardDescription>
-            Filtre las transacciones según sus criterios
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-            {/* Nombre */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Nombre</label>
-              <Input
-                type="text"
-                value={searchNombre}
-                onChange={(e) => setSearchNombre(e.target.value)}
-                placeholder="Buscar por nombre"
-                className="w-full"
-              />
-            </div>
+<Card className="mb-6">
+  <CardHeader>
+    <CardTitle className="flex items-center gap-2">
+      <Filter className="h-5 w-5" />
+      Filtros de Búsqueda
+    </CardTitle>
+    <CardDescription>
+      Filtre las transacciones según sus criterios
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      {/* Nombre */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Nombre</label>
+        <Input
+          type="text"
+          value={searchNombre}
+          onChange={(e) => setSearchNombre(e.target.value)}
+          placeholder="Buscar nombre"
+          className="w-full"
+        />
+      </div>
 
-            {/* DNI */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">DNI</label>
-              <Input
-                type="text"
-                value={searchDNI}
-                onChange={(e) => setSearchDNI(e.target.value)}
-                placeholder="Buscar por DNI"
-                className="w-full"
-              />
-            </div>
+      {/* DNI */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">DNI</label>
+        <Input
+          type="text"
+          value={searchDNI}
+          onChange={(e) => setSearchDNI(e.target.value)}
+          placeholder="Buscar DNI"
+          className="w-full"
+        />
+      </div>
 
-            {/* Tipo */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Tipo</label>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="compra">Compra</SelectItem>
-                  <SelectItem value="venta">Venta</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Tipo */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Tipo</label>
+        <Select value={filterType} onValueChange={setFilterType}>
+          <SelectTrigger>
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="compra">Compra</SelectItem>
+            <SelectItem value="venta">Venta</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-            {/* Moneda */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Moneda</label>
-              <Select value={filterCurrency} onValueChange={setFilterCurrency}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todas</SelectItem>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="EUR">EUR</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Moneda */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">Moneda</label>
+        <Select value={filterCurrency} onValueChange={setFilterCurrency}>
+          <SelectTrigger>
+            <SelectValue placeholder="Todas" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas</SelectItem>
+            <SelectItem value="USD">USD</SelectItem>
+            <SelectItem value="EUR">EUR</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-            {/* Fechas */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Fecha Inicial</label>
-              <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(startDate, 'dd/MM/yy')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={(date) => {
-                      if (date) setStartDate(date);
-                      setStartDateOpen(false);
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Fecha Final</label>
-              <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(endDate, 'dd/MM/yy')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={(date) => {
-                      if (date) setEndDate(date);
-                      setEndDateOpen(false);
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+      {/* Fechas - Ocupa 2 columnas */}
+      <div className="space-y-2 lg:col-span-2">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Desde</label>
+            <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal h-10"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(startDate, 'dd/MM/yy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={startDate}
+                  onSelect={(date) => {
+                    if (date) setStartDate(date);
+                    setStartDateOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium">Hasta</label>
+            <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`w-full justify-start text-left font-normal h-10 ${
+                    !isDateRangeValid ? 'border-destructive' : ''
+                  }`}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {format(endDate, 'dd/MM/yy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={endDate}
+                  onSelect={(date) => {
+                    if (date) setEndDate(date);
+                    setEndDateOpen(false);
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+        {dateError && (
+          <p className="text-destructive text-xs mt-1">{dateError}</p>
+        )}
+      </div>
+    </div>
 
           {/* Botones de Acción */}
           <div className="flex gap-3 mt-6">
             <Button 
               onClick={generateReport} 
-              disabled={loading}
+              disabled={loading || !isDateRangeValid}
               className="flex-1"
             >
               <Search className="mr-2 h-4 w-4" />
@@ -497,16 +583,21 @@ const Reports: React.FC = () => {
             </Button>
 
             <Button
-              variant="ghost"
-              onClick={clearFilters}
-              className="w-32"
-            >
-              Limpiar
-            </Button>
+            variant="ghost"
+            onClick={() => {
+              clearFilters();
+              setStartDate(subDays(new Date(), 30)); // Reset a últimos 30 días
+              setEndDate(new Date()); // Reset a fecha actual
+            }}
+            className="min-w-[100px]"
+          >
+            Limpiar
+          </Button>
           </div>
 
           <div className="text-sm text-muted-foreground text-center mt-4">
-            {filteredTransactions.length} transacciones encontradas
+            {filteredTransactions.length} transacciones encontradas • 
+            Período: {format(startDate, 'dd/MM/yyyy')} - {format(endDate, 'dd/MM/yyyy')}
           </div>
         </CardContent>
       </Card>
@@ -562,12 +653,13 @@ const Reports: React.FC = () => {
         </Card>
       </div>
 
-      {/* Gráficos */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      {/* Gráficos - 3 columnas */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        {/* Compras vs Ventas por Día */}
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>Compras vs Ventas por Día</CardTitle>
-            <CardDescription>Evolución diaria del volumen</CardDescription>
+            <CardDescription>Evolución diaria exacta según filtros</CardDescription>
           </CardHeader>
           <CardContent>
             {metrics.dailyData.length > 0 ? (
@@ -607,6 +699,7 @@ const Reports: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Distribución por Moneda */}
         <Card>
           <CardHeader>
             <CardTitle>Distribución por Moneda</CardTitle>
@@ -644,6 +737,102 @@ const Reports: React.FC = () => {
             ) : (
               <div className="flex items-center justify-center h-64 text-muted-foreground">
                 No hay datos de monedas
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Nuevos Gráficos - 2 columnas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Clientes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Award className="h-5 w-5" />
+              Top 5 Clientes por Volumen
+            </CardTitle>
+            <CardDescription>Clientes con mayor volumen de transacciones</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {metrics.topClients.length > 0 ? (
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <ReBarChart
+                    data={metrics.topClients}
+                    layout="vertical"
+                    margin={{ top: 10, right: 30, left: 80, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      width={80}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip 
+                      formatter={(value, name) => {
+                        if (name === 'volume') return [`S/ ${Number(value).toFixed(2)}`, 'Volumen'];
+                        return [value, 'Transacciones'];
+                      }}
+                    />
+                    <Legend />
+                    <Bar 
+                      dataKey="volume" 
+                      name="Volumen (S/)" 
+                      fill="#8884d8" 
+                      radius={[0, 2, 2, 0]}
+                    />
+                  </ReBarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                No hay datos de clientes
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Tendencia Semanal */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Tendencia Semanal
+            </CardTitle>
+            <CardDescription>Evolución del volumen por semana</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {metrics.weeklyTrend.length > 0 ? (
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <LineChart
+                    data={metrics.weeklyTrend}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="week" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value) => [`S/ ${Number(value).toFixed(2)}`, 'Volumen']}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="volume" 
+                      name="Volumen (S/)" 
+                      stroke="#8884d8" 
+                      strokeWidth={2}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-64 text-muted-foreground">
+                No hay datos para tendencia
               </div>
             )}
           </CardContent>
