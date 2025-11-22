@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Shield, Loader2 } from 'lucide-react';
 
-// 🔥 Firebase
+//  Firebase
 import { auth } from '@/integrations/firebase/client';
 import {
   onAuthStateChanged,

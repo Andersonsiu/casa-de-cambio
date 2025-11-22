@@ -26,7 +26,7 @@ type MenuItem = {
   label: string;
   path: string;
   color: string;
-  roles: AppRole[];
+  roles: AppRole[]; // quiénes PUEDEN verlo
 };
 
 const SIDEBAR_COLLAPSED_KEY = 'Rojas - Casa de cambio:sidebar-collapsed';
@@ -34,7 +34,6 @@ const SIDEBAR_COLLAPSED_KEY = 'Rojas - Casa de cambio:sidebar-collapsed';
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  // Estado inicial desde localStorage (solo navegador)
   const [isCollapsed, setIsCollapsed] = React.useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
@@ -67,17 +66,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Reportes',
       path: '/reports',
       color: 'text-finance-eur',
-      roles: ['admin'],
+      roles: ['admin'], // 👈 SOLO admin lo ve
     },
     {
       icon: Settings,
       label: 'Configuración',
       path: '/settings',
       color: 'text-muted-foreground',
-      roles: ['admin'],
+      roles: ['admin', 'operator'], 
     },
   ];
 
+  // Ahora sí filtramos por rol: al operador NI LE SALE "Reportes"
   const menuItems = React.useMemo(
     () =>
       allMenuItems.filter((item) =>
@@ -137,7 +137,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       >
         {/* Header sidebar */}
         <div className="flex h-20 items-center justify-between px-6 border-b border-sidebar-border bg-finance-surface">
-          {/* Logo + título. Cuando está colapsado, este bloque sirve para EXPANDIR */}
+          {/* Logo / título: clic cuando está colapsado para expandir */}
           <div
             className={`flex items-center gap-3 transition-all duration-300 ${
               isCollapsed ? 'justify-center cursor-pointer' : ''
@@ -156,7 +156,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             {!isCollapsed && (
               <div className="flex flex-col">
                 <h1 className="text-xl font-bold text-finance-primary">
-                  Rojas 
+                  Rojas
                 </h1>
                 <span className="text-xs text-muted-foreground font-medium">
                   Casa de cambio
@@ -165,8 +165,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             )}
           </div>
 
-          {/* Desktop: botón de colapsar/expandir DENTRO de la sidebar.
-              Solo se muestra cuando la sidebar está expandida. */}
+          {/* Desktop: colapsar/expandir, solo cuando está expandida */}
           {!isMobile && !isCollapsed && (
             <button
               onClick={handleToggleCollapsed}
@@ -177,7 +176,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             </button>
           )}
 
-          {/* Mobile: botón para cerrar el offcanvas */}
+          {/* Mobile: cerrar drawer */}
           {isMobile && (
             <button
               onClick={() => setSidebarOpen(false)}
@@ -205,10 +204,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     type="button"
                     onClick={() => {
                       navigate(item.path);
-                      // En móvil cerramos el panel; en desktop NO tocamos isCollapsed
                       if (isMobile) setSidebarOpen(false);
                     }}
-                    className={`w-full text-left group relative flex items-center rounded-xl px-4 py-3.5 transition-all duration-200
+                    className={`w-full text-left group relative flex items-center rounded-xl px-4 py-3.5 transition-all duración-200
                               ${isCollapsed ? 'justify-center' : 'gap-4'}
                               ${
                                 isActiveItem
@@ -272,7 +270,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         {/* Header */}
         <header className="bg-white border-b border-sidebar-border shadow-card">
           <div className="flex h-16 items-center justify-between px-6">
-            {/* Solo móvil: botón para abrir el offcanvas */}
+            {/* Solo móvil: abrir drawer */}
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 rounded-xl hover:bg-finance-primary/10 transition-colors md:hidden group"
