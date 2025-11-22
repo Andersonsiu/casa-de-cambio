@@ -34,7 +34,7 @@ const SIDEBAR_COLLAPSED_KEY = 'safeexchange:sidebar-collapsed';
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  // ⚙️ Lee el estado inicial desde localStorage (solo en navegador)
+  // Estado inicial desde localStorage (solo navegador)
   const [isCollapsed, setIsCollapsed] = React.useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const stored = window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
@@ -137,10 +137,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       >
         {/* Header sidebar */}
         <div className="flex h-20 items-center justify-between px-6 border-b border-sidebar-border bg-finance-surface">
+          {/* Logo + título. Cuando está colapsado, este bloque sirve para EXPANDIR */}
           <div
             className={`flex items-center gap-3 transition-all duration-300 ${
-              isCollapsed ? 'justify-center' : ''
+              isCollapsed ? 'justify-center cursor-pointer' : ''
             }`}
+            onClick={isCollapsed ? handleToggleCollapsed : undefined}
+            title={isCollapsed ? 'Expandir menú' : undefined}
           >
             <div className="relative">
               <div className="w-10 h-10 bg-finance-primary rounded-xl flex items-center justify-center shadow-soft">
@@ -162,11 +165,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             )}
           </div>
 
-          {/* Desktop: botón de colapsar/expandir DENTRO de la sidebar */}
-          {!isMobile && (
+          {/* Desktop: botón de colapsar/expandir DENTRO de la sidebar.
+              Solo se muestra cuando la sidebar está expandida. */}
+          {!isMobile && !isCollapsed && (
             <button
               onClick={handleToggleCollapsed}
               className="p-2 rounded-lg hover:bg-sidebar-accent transition-colors group"
+              title="Colapsar menú"
             >
               <Menu className="h-4 w-4 text-sidebar-foreground transition-transform" />
             </button>
@@ -220,9 +225,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                     >
                       <Icon
                         className={`h-5 w-5 transition-all duration-200 ${
-                          isActiveItem
-                            ? item.color
-                            : 'text-sidebar-foreground'
+                          isActiveItem ? item.color : 'text-sidebar-foreground'
                         }`}
                       />
                     </div>
