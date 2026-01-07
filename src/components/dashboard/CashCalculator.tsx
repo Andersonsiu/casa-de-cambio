@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { EnhancedButton } from '@/components/ui/enhanced-button';
 import { Calculator, DollarSign, Euro, TrendingUp, AlertCircle, Info, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { db, auth } from '@/integrations/firebase/client';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CashCalculation {
@@ -69,6 +70,13 @@ const CashCalculator: React.FC = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        setTransactions([]);
+        setLoading(false);
+        return;
+      }
+
       let dateStart: string;
       let dateEnd: string;
 
@@ -92,19 +100,27 @@ const CashCalculator: React.FC = () => {
         dateEnd = `${year}-${selectedMonth}-${lastDay.toString().padStart(2, '0')}`;
       }
 
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .gte('transaction_date', dateStart)
-        .lte('transaction_date', dateEnd);
+      // Consultar Firestore
+      const transactionsRef = collection(db, 'transactions');
+      const q = query(
+        transactionsRef,
+        where('transaction_date', '>=', dateStart),
+        where('transaction_date', '<=', dateEnd)
+      );
 
-      if (error) {
-        console.error('Error fetching transactions:', error);
-        toast.error('Error al cargar las transacciones');
-        return;
-      }
+      const querySnapshot = await getDocs(q);
+      const fetchedTransactions: Transaction[] = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        amount: doc.data().amount || 0,
+        currency: doc.data().currency || 'USD',
+        type: doc.data().type || 'compra',
+        rate: doc.data().rate || 0,
+        transaction_date: doc.data().transaction_date || '',
+        total: doc.data().total || 0,
+      }));
 
-      setTransactions(data || []);
+      setTransactions(fetchedTransactions);
+      console.log(`Transacciones encontradas: ${fetchedTransactions.length}`, fetchedTransactions);
     } catch (error) {
       console.error('Error al cargar transacciones:', error);
       toast.error('Error al cargar las transacciones');
